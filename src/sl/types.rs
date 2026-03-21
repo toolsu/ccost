@@ -62,6 +62,11 @@ pub struct SlWindowSummary {
     pub sessions: u32,
     pub total_cost: f64,
     pub est_budget: Option<f64>,
+    pub total_duration_ms: u64,
+    pub total_api_duration_ms: u64,
+    pub total_lines_added: u64,
+    pub total_lines_removed: u64,
+    pub peak_seven_day_pct: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -72,6 +77,10 @@ pub struct SlProjectSummary {
     pub total_duration_ms: u64,
     pub total_api_duration_ms: u64,
     pub session_count: u32,
+    pub total_lines_added: u64,
+    pub total_lines_removed: u64,
+    pub peak_five_hour_pct: Option<u8>,
+    pub peak_seven_day_pct: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -82,6 +91,10 @@ pub struct SlDaySummary {
     pub session_count: u32,
     pub peak_five_hour_pct: Option<u8>,
     pub peak_seven_day_pct: Option<u8>,
+    pub total_duration_ms: u64,
+    pub total_api_duration_ms: u64,
+    pub total_lines_added: u64,
+    pub total_lines_removed: u64,
 }
 
 #[derive(Debug, Clone, Default)]

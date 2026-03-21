@@ -302,31 +302,92 @@ pub fn format_sl_ratelimit_table(entries: &[SlRateLimitEntry], opts: &SlFormatOp
     render_table(&headers, &rows, opts.color)
 }
 
+// ─── Unified table helpers ────────────────────────────────────────────────────
+
+/// Build unified headers for any sl --per view.
+///
+/// Full:    [Label] | Cost | Duration | API Time | API% | Lines +/- | [count_label] | Peak 5h% | Peak 7d% | [extra_header]
+/// Compact: [Label] | Cost | Duration | [count_label] | Peak 5h%
+fn unified_headers(label: &str, count_label: &str, compact: bool, extra_header: Option<&str>) -> Vec<String> {
+    let mut headers = vec![label.to_string(), "Cost".to_string(), "Duration".to_string()];
+    if compact {
+        headers.push(count_label.to_string());
+        headers.push("Peak 5h%".to_string());
+    } else {
+        headers.push("API Time".to_string());
+        headers.push("API%".to_string());
+        headers.push("Lines +/-".to_string());
+        headers.push(count_label.to_string());
+        headers.push("Peak 5h%".to_string());
+        headers.push("Peak 7d%".to_string());
+    }
+    if let Some(extra) = extra_header {
+        headers.push(extra.to_string());
+    }
+    headers
+}
+
+/// Build a unified row for any sl --per view.
+fn build_unified_row(
+    label: String,
+    cost: f64,
+    duration_ms: u64,
+    api_duration_ms: u64,
+    lines_added: u64,
+    lines_removed: u64,
+    count: u32,
+    peak_5h: Option<u8>,
+    peak_7d: Option<u8>,
+    price_mode: PriceMode,
+    compact: bool,
+    extra: Option<String>,
+) -> Vec<String> {
+    let cost_str = format_cost(cost, price_mode);
+    let duration_str = fmt_duration(duration_ms);
+
+    let mut row = vec![label, cost_str, duration_str];
+
+    if compact {
+        row.push(count.to_string());
+        row.push(match peak_5h {
+            Some(p) => format!("{}%", p),
+            None => "\u{2014}".to_string(),
+        });
+    } else {
+        let api_time_str = fmt_duration(api_duration_ms);
+        let api_pct_str = if duration_ms > 0 {
+            format!("{:.0}%", api_duration_ms as f64 / duration_ms as f64 * 100.0)
+        } else {
+            "\u{2014}".to_string()
+        };
+        let lines_str = format!("+{} -{}", lines_added, lines_removed);
+
+        row.push(api_time_str);
+        row.push(api_pct_str);
+        row.push(lines_str);
+        row.push(count.to_string());
+        row.push(match peak_5h {
+            Some(p) => format!("{}%", p),
+            None => "\u{2014}".to_string(),
+        });
+        row.push(match peak_7d {
+            Some(p) => format!("{}%", p),
+            None => "\u{2014}".to_string(),
+        });
+    }
+
+    if let Some(extra_val) = extra {
+        row.push(extra_val);
+    }
+
+    row
+}
+
 // ─── Session table ────────────────────────────────────────────────────────────
 
 /// Format session summaries as a table.
 pub fn format_sl_session_table(sessions: &[SlSessionSummary], opts: &SlFormatOptions) -> String {
-    let headers: Vec<String> = if opts.compact {
-        vec![
-            "Session".to_string(),
-            "Project".to_string(),
-            "Cost".to_string(),
-            "Duration".to_string(),
-            "Lines +/-".to_string(),
-        ]
-    } else {
-        vec![
-            "Session".to_string(),
-            "Project".to_string(),
-            "Cost".to_string(),
-            "Duration".to_string(),
-            "API Time".to_string(),
-            "API%".to_string(),
-            "Lines +/-".to_string(),
-            "Ctx%".to_string(),
-            "Segs".to_string(),
-        ]
-    };
+    let headers = unified_headers("Session", "Segs", opts.compact, None);
 
     let rows: Vec<Vec<String>> = sessions
         .iter()
@@ -336,44 +397,21 @@ pub fn format_sl_session_table(sessions: &[SlSessionSummary], opts: &SlFormatOpt
             } else {
                 s.session_id.clone()
             };
-            let project_short = shorten_project(&s.project);
-            let cost_str = format_cost(s.total_cost, opts.price_mode);
-            let duration_str = fmt_duration(s.total_duration_ms);
-            let lines_str = format!("+{} -{}", s.total_lines_added, s.total_lines_removed);
 
-            if opts.compact {
-                vec![
-                    sess_short,
-                    project_short,
-                    cost_str,
-                    duration_str,
-                    lines_str,
-                ]
-            } else {
-                let api_time_str = fmt_duration(s.total_api_duration_ms);
-                let api_pct_str = if s.total_duration_ms > 0 {
-                    format!("{:.0}%", s.total_api_duration_ms as f64 / s.total_duration_ms as f64 * 100.0)
-                } else {
-                    "\u{2014}".to_string()
-                };
-                let ctx_pct_str = match s.max_context_pct {
-                    Some(p) => format!("{}%", p),
-                    None => "\u{2014}".to_string(),
-                };
-                let segs_str = s.segments.to_string();
-
-                vec![
-                    sess_short,
-                    project_short,
-                    cost_str,
-                    duration_str,
-                    api_time_str,
-                    api_pct_str,
-                    lines_str,
-                    ctx_pct_str,
-                    segs_str,
-                ]
-            }
+            build_unified_row(
+                sess_short,
+                s.total_cost,
+                s.total_duration_ms,
+                s.total_api_duration_ms,
+                s.total_lines_added,
+                s.total_lines_removed,
+                s.segments,
+                s.last_five_hour_pct,
+                s.last_seven_day_pct,
+                opts.price_mode,
+                opts.compact,
+                None,
+            )
         })
         .collect();
 
@@ -384,24 +422,25 @@ pub fn format_sl_session_table(sessions: &[SlSessionSummary], opts: &SlFormatOpt
 
 /// Format project summaries as a table.
 pub fn format_sl_project_table(projects: &[SlProjectSummary], opts: &SlFormatOptions) -> String {
-    let headers: Vec<String> = vec![
-        "Project".to_string(),
-        "Cost".to_string(),
-        "Duration".to_string(),
-        "API Time".to_string(),
-        "Sessions".to_string(),
-    ];
+    let headers = unified_headers("Project", "Sessions", opts.compact, None);
 
     let rows: Vec<Vec<String>> = projects
         .iter()
         .map(|p| {
-            vec![
+            build_unified_row(
                 p.project.clone(),
-                format_cost(p.total_cost, opts.price_mode),
-                fmt_duration(p.total_duration_ms),
-                fmt_duration(p.total_api_duration_ms),
-                p.session_count.to_string(),
-            ]
+                p.total_cost,
+                p.total_duration_ms,
+                p.total_api_duration_ms,
+                p.total_lines_added,
+                p.total_lines_removed,
+                p.session_count,
+                p.peak_five_hour_pct,
+                p.peak_seven_day_pct,
+                opts.price_mode,
+                opts.compact,
+                None,
+            )
         })
         .collect();
 
@@ -412,30 +451,25 @@ pub fn format_sl_project_table(projects: &[SlProjectSummary], opts: &SlFormatOpt
 
 /// Format day summaries as a table.
 pub fn format_sl_day_table(days: &[SlDaySummary], opts: &SlFormatOptions) -> String {
-    let headers: Vec<String> = vec![
-        "Date".to_string(),
-        "Cost".to_string(),
-        "Sessions".to_string(),
-        "Peak 5h%".to_string(),
-        "Peak 7d%".to_string(),
-    ];
+    let headers = unified_headers("Date", "Sessions", opts.compact, None);
 
     let rows: Vec<Vec<String>> = days
         .iter()
         .map(|d| {
-            vec![
+            build_unified_row(
                 d.date.clone(),
-                format_cost(d.total_cost, opts.price_mode),
-                d.session_count.to_string(),
-                match d.peak_five_hour_pct {
-                    Some(p) => format!("{}%", p),
-                    None => "\u{2014}".to_string(),
-                },
-                match d.peak_seven_day_pct {
-                    Some(p) => format!("{}%", p),
-                    None => "\u{2014}".to_string(),
-                },
-            ]
+                d.total_cost,
+                d.total_duration_ms,
+                d.total_api_duration_ms,
+                d.total_lines_added,
+                d.total_lines_removed,
+                d.session_count,
+                d.peak_five_hour_pct,
+                d.peak_seven_day_pct,
+                opts.price_mode,
+                opts.compact,
+                None,
+            )
         })
         .collect();
 
@@ -448,13 +482,7 @@ pub fn format_sl_day_table(days: &[SlDaySummary], opts: &SlFormatOptions) -> Str
 pub fn format_sl_window_table(windows: &[SlWindowSummary], opts: &SlFormatOptions) -> String {
     let tz = opts.tz.as_deref();
 
-    let headers: Vec<String> = vec![
-        "5h Window".to_string(),
-        "Peak 5h%".to_string(),
-        "Sessions".to_string(),
-        "Cost".to_string(),
-        "Est Budget".to_string(),
-    ];
+    let headers = unified_headers("5h Window", "Sessions", opts.compact, Some("Est Budget"));
 
     let rows: Vec<Vec<String>> = windows
         .iter()
@@ -468,13 +496,21 @@ pub fn format_sl_window_table(windows: &[SlWindowSummary], opts: &SlFormatOption
                 Some(b) => format_cost(b, opts.price_mode),
                 None => "\u{2014}".to_string(),
             };
-            vec![
+
+            build_unified_row(
                 window_str,
-                format!("{}%", w.peak_five_hour_pct),
-                w.sessions.to_string(),
-                format_cost(w.total_cost, opts.price_mode),
-                est_budget_str,
-            ]
+                w.total_cost,
+                w.total_duration_ms,
+                w.total_api_duration_ms,
+                w.total_lines_added,
+                w.total_lines_removed,
+                w.sessions,
+                Some(w.peak_five_hour_pct),
+                w.peak_seven_day_pct,
+                opts.price_mode,
+                opts.compact,
+                Some(est_budget_str),
+            )
         })
         .collect();
 
@@ -862,14 +898,14 @@ mod tests {
         };
         let result = format_sl_session_table(&sessions, &opts);
         assert!(result.contains("Session"), "should contain Session header");
-        assert!(result.contains("Project"), "should contain Project header");
         assert!(result.contains("Cost"), "should contain Cost header");
         assert!(result.contains("Duration"), "should contain Duration header");
         assert!(result.contains("API Time"), "should contain API Time header");
         assert!(result.contains("API%"), "should contain API% header");
         assert!(result.contains("Lines +/-"), "should contain Lines +/- header");
-        assert!(result.contains("Ctx%"), "should contain Ctx% header");
         assert!(result.contains("Segs"), "should contain Segs header");
+        assert!(result.contains("Peak 5h%"), "should contain Peak 5h% header");
+        assert!(result.contains("Peak 7d%"), "should contain Peak 7d% header");
     }
 
     #[test]
@@ -886,8 +922,10 @@ mod tests {
         let result = format_sl_session_table(&sessions, &opts);
         assert!(result.contains("Session"), "should contain Session header");
         assert!(result.contains("Cost"), "should contain Cost header");
+        assert!(result.contains("Segs"), "should contain Segs header");
+        assert!(result.contains("Peak 5h%"), "should contain Peak 5h% header");
         assert!(!result.contains("API Time"), "compact should not contain API Time");
-        assert!(!result.contains("Segs"), "compact should not contain Segs");
+        assert!(!result.contains("Peak 7d%"), "compact should not contain Peak 7d%");
     }
 
     #[test]
@@ -904,21 +942,6 @@ mod tests {
         };
         let result = format_sl_session_table(&sessions, &opts);
         assert!(result.contains("50%"), "should contain 50% API ratio");
-    }
-
-    #[test]
-    fn test_session_table_project_shortened() {
-        let sessions = vec![make_session_summary(
-            "abc123", "/home/user/foo/bar", 0.50, 3600_000, 1800_000, 100, 50, Some(75), 2
-        )];
-        let opts = SlFormatOptions {
-            tz: Some("UTC".to_string()),
-            price_mode: PriceMode::Decimal,
-            compact: false,
-            color: false,
-        };
-        let result = format_sl_session_table(&sessions, &opts);
-        assert!(result.contains(".../foo/bar"), "project should be shortened to last 2 components");
     }
 
     #[test]
@@ -976,6 +999,11 @@ mod tests {
             sessions: 3,
             total_cost: 1.23,
             est_budget: Some(2.73),
+            total_duration_ms: 5000,
+            total_api_duration_ms: 2000,
+            total_lines_added: 10,
+            total_lines_removed: 5,
+            peak_seven_day_pct: Some(60),
         }];
         let meta = SlJsonMeta {
             source: "test".to_string(),

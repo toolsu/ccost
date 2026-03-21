@@ -246,6 +246,12 @@ pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary]) -
         let unique_sessions: HashSet<&str> = window_recs.iter().map(|r| r.session_id.as_str()).collect();
         let session_count = unique_sessions.len() as u32;
 
+        // Track peak 7d%
+        let peak_seven_day_pct = window_recs
+            .iter()
+            .filter_map(|r| r.seven_day_pct)
+            .max();
+
         // Mini segment detection per session within window
         let mut by_session_window: BTreeMap<&str, Vec<&SlRecord>> = BTreeMap::new();
         for rec in &window_recs {
@@ -253,10 +259,18 @@ pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary]) -
         }
 
         let mut total_cost = 0.0_f64;
+        let mut total_duration_ms = 0_u64;
+        let mut total_api_duration_ms = 0_u64;
+        let mut total_lines_added = 0_u64;
+        let mut total_lines_removed = 0_u64;
         for (_, mut sess_recs) in by_session_window {
             sess_recs.sort_by_key(|r| r.ts);
-            let (_, cost, _, _, _, _) = compute_segment_totals(&sess_recs);
+            let (_, cost, dur, api_dur, added, removed) = compute_segment_totals(&sess_recs);
             total_cost += cost;
+            total_duration_ms += dur;
+            total_api_duration_ms += api_dur;
+            total_lines_added += added;
+            total_lines_removed += removed;
         }
 
         let est_budget = if peak_five_hour_pct > 0 {
@@ -272,6 +286,11 @@ pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary]) -
             sessions: session_count,
             total_cost,
             est_budget,
+            total_duration_ms,
+            total_api_duration_ms,
+            total_lines_added,
+            total_lines_removed,
+            peak_seven_day_pct,
         });
     }
 
@@ -289,11 +308,29 @@ pub fn aggregate_by_project(sessions: &[SlSessionSummary]) -> Vec<SlProjectSumma
             total_duration_ms: 0,
             total_api_duration_ms: 0,
             session_count: 0,
+            total_lines_added: 0,
+            total_lines_removed: 0,
+            peak_five_hour_pct: None,
+            peak_seven_day_pct: None,
         });
         entry.total_cost += s.total_cost;
         entry.total_duration_ms += s.total_duration_ms;
         entry.total_api_duration_ms += s.total_api_duration_ms;
         entry.session_count += 1;
+        entry.total_lines_added += s.total_lines_added;
+        entry.total_lines_removed += s.total_lines_removed;
+        if let Some(pct) = s.last_five_hour_pct {
+            entry.peak_five_hour_pct = Some(match entry.peak_five_hour_pct {
+                Some(existing) => existing.max(pct),
+                None => pct,
+            });
+        }
+        if let Some(pct) = s.last_seven_day_pct {
+            entry.peak_seven_day_pct = Some(match entry.peak_seven_day_pct {
+                Some(existing) => existing.max(pct),
+                None => pct,
+            });
+        }
     }
 
     by_project.into_values().collect()
@@ -314,10 +351,18 @@ pub fn aggregate_by_day(sessions: &[SlSessionSummary], tz: Option<&str>) -> Vec<
             session_count: 0,
             peak_five_hour_pct: None,
             peak_seven_day_pct: None,
+            total_duration_ms: 0,
+            total_api_duration_ms: 0,
+            total_lines_added: 0,
+            total_lines_removed: 0,
         });
 
         entry.total_cost += s.total_cost;
         entry.session_count += 1;
+        entry.total_duration_ms += s.total_duration_ms;
+        entry.total_api_duration_ms += s.total_api_duration_ms;
+        entry.total_lines_added += s.total_lines_added;
+        entry.total_lines_removed += s.total_lines_removed;
 
         // Update peak percentages
         if let Some(pct) = s.last_five_hour_pct {

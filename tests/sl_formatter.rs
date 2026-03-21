@@ -266,14 +266,14 @@ fn test_session_table_full_headers() {
     let result = format_sl_session_table(&sessions, &opts);
 
     assert!(result.contains("Session"), "should contain Session");
-    assert!(result.contains("Project"), "should contain Project");
     assert!(result.contains("Cost"), "should contain Cost");
     assert!(result.contains("Duration"), "should contain Duration");
     assert!(result.contains("API Time"), "should contain API Time");
     assert!(result.contains("API%"), "should contain API%");
     assert!(result.contains("Lines +/-"), "should contain Lines +/-");
-    assert!(result.contains("Ctx%"), "should contain Ctx%");
     assert!(result.contains("Segs"), "should contain Segs");
+    assert!(result.contains("Peak 5h%"), "should contain Peak 5h%");
+    assert!(result.contains("Peak 7d%"), "should contain Peak 7d%");
 }
 
 #[test]
@@ -291,12 +291,12 @@ fn test_session_table_compact_headers() {
 
     assert!(result.contains("Session"), "should contain Session");
     assert!(result.contains("Cost"), "should contain Cost");
-    assert!(result.contains("Lines +/-"), "should contain Lines +/-");
+    assert!(result.contains("Segs"), "should contain Segs");
+    assert!(result.contains("Peak 5h%"), "should contain Peak 5h%");
     // Columns hidden in compact mode
     assert!(!result.contains("API Time"), "compact should not have API Time");
     assert!(!result.contains("API%"), "compact should not have API%");
-    assert!(!result.contains("Ctx%"), "compact should not have Ctx%");
-    assert!(!result.contains("Segs"), "compact should not have Segs");
+    assert!(!result.contains("Peak 7d%"), "compact should not have Peak 7d%");
 }
 
 #[test]
@@ -348,7 +348,7 @@ fn test_session_table_zero_duration_api_pct_em_dash() {
 }
 
 #[test]
-fn test_session_table_project_shortened() {
+fn test_session_table_duration_shown() {
     let sessions = vec![make_session_summary(
         "abc123", "/home/user/foo/bar", 0.50, 3_600_000, 1_800_000, 100, 50, Some(75), 2,
     )];
@@ -359,10 +359,7 @@ fn test_session_table_project_shortened() {
         color: false,
     };
     let result = format_sl_session_table(&sessions, &opts);
-    assert!(
-        result.contains(".../foo/bar"),
-        "project should be shortened to last 2 path components"
-    );
+    assert!(result.contains("1h 0m"), "should show duration formatted as hours and minutes");
 }
 
 #[test]
@@ -381,7 +378,7 @@ fn test_session_table_lines_format() {
 }
 
 #[test]
-fn test_session_table_ctx_pct_none_em_dash() {
+fn test_session_table_peak_pct_shown() {
     let sessions = vec![make_session_summary(
         "abc123", "/proj/a", 0.5, 1_000, 500, 0, 0, None, 1,
     )];
@@ -392,8 +389,9 @@ fn test_session_table_ctx_pct_none_em_dash() {
         color: false,
     };
     let result = format_sl_session_table(&sessions, &opts);
-    // Em dash for None context percentage
-    assert!(result.contains('\u{2014}'), "None ctx_pct should show em dash");
+    // make_session_summary sets last_five_hour_pct=30, last_seven_day_pct=50
+    assert!(result.contains("30%"), "should show peak 5h%");
+    assert!(result.contains("50%"), "should show peak 7d%");
 }
 
 #[test]
@@ -521,6 +519,11 @@ fn test_json_windows_structure() {
         sessions: 3,
         total_cost: 1.23,
         est_budget: Some(2.73),
+        total_duration_ms: 5000,
+        total_api_duration_ms: 2000,
+        total_lines_added: 10,
+        total_lines_removed: 5,
+        peak_seven_day_pct: Some(60),
     }];
     let meta = make_json_meta("windows");
     let result = format_sl_json_windows(&windows, &meta);
@@ -539,6 +542,10 @@ fn test_json_projects_structure() {
         total_duration_ms: 10_000,
         total_api_duration_ms: 5_000,
         session_count: 4,
+        total_lines_added: 20,
+        total_lines_removed: 8,
+        peak_five_hour_pct: Some(40),
+        peak_seven_day_pct: Some(70),
     }];
     let meta = make_json_meta("projects");
     let result = format_sl_json_projects(&projects, &meta);
@@ -556,6 +563,10 @@ fn test_json_days_structure() {
         session_count: 5,
         peak_five_hour_pct: Some(60),
         peak_seven_day_pct: Some(80),
+        total_duration_ms: 7_200_000,
+        total_api_duration_ms: 3_600_000,
+        total_lines_added: 50,
+        total_lines_removed: 20,
     }];
     let meta = make_json_meta("days");
     let result = format_sl_json_days(&days, &meta);
