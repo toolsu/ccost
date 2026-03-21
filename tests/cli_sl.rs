@@ -104,7 +104,7 @@ fn sl_cmd() -> Command {
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-/// 1. Default sl view (rate-limit timeline) should show 5h% and 7d% columns.
+/// 1. Default sl view (rate-limit timeline) should show 5h% and 1w% columns.
 #[test]
 fn test_sl_default_ratelimit() {
     let f = create_test_file();
@@ -115,7 +115,7 @@ fn test_sl_default_ratelimit() {
         .assert()
         .success()
         .stdout(predicate::str::contains("5h%"))
-        .stdout(predicate::str::contains("7d%"));
+        .stdout(predicate::str::contains("1w%"));
 }
 
 /// 2. --per session shows session IDs and cumulative costs.
@@ -147,7 +147,7 @@ fn test_sl_per_window() {
     let path = f.path().to_str().unwrap();
 
     sl_cmd()
-        .args(["sl", "--file", path, "--per", "window", "--cost", "decimal"])
+        .args(["sl", "--file", path, "--per", "5h", "--cost", "decimal"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Peak 5h%"))

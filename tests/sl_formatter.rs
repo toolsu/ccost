@@ -145,7 +145,7 @@ fn test_ratelimit_table_headers_full() {
     // Check all expected column headers
     assert!(result.contains("Time"), "should contain Time");
     assert!(result.contains("5h%"), "should contain 5h%");
-    assert!(result.contains("7d%"), "should contain 7d%");
+    assert!(result.contains("1w%"), "should contain 1w%");
     assert!(result.contains("5h Resets"), "should contain 5h Resets");
     assert!(result.contains("Session"), "should contain Session");
 }
@@ -165,7 +165,7 @@ fn test_ratelimit_table_compact_no_session_column() {
 
     assert!(!result.contains("Session"), "compact should hide Session column");
     assert!(result.contains("5h%"), "should still contain 5h%");
-    assert!(result.contains("7d%"), "should still contain 7d%");
+    assert!(result.contains("1w%"), "should still contain 1w%");
 }
 
 #[test]
@@ -273,7 +273,7 @@ fn test_session_table_full_headers() {
     assert!(result.contains("Lines +/-"), "should contain Lines +/-");
     assert!(result.contains("Segs"), "should contain Segs");
     assert!(result.contains("Peak 5h%"), "should contain Peak 5h%");
-    assert!(result.contains("Peak 7d%"), "should contain Peak 7d%");
+    assert!(result.contains("Peak 1w%"), "should contain Peak 1w%");
 }
 
 #[test]
@@ -296,7 +296,7 @@ fn test_session_table_compact_headers() {
     // Columns hidden in compact mode
     assert!(!result.contains("API Time"), "compact should not have API Time");
     assert!(!result.contains("API%"), "compact should not have API%");
-    assert!(!result.contains("Peak 7d%"), "compact should not have Peak 7d%");
+    assert!(!result.contains("Peak 1w%"), "compact should not have Peak 1w%");
 }
 
 #[test]
@@ -391,7 +391,7 @@ fn test_session_table_peak_pct_shown() {
     let result = format_sl_session_table(&sessions, &opts);
     // make_session_summary sets last_five_hour_pct=30, last_seven_day_pct=50
     assert!(result.contains("30%"), "should show peak 5h%");
-    assert!(result.contains("50%"), "should show peak 7d%");
+    assert!(result.contains("50%"), "should show peak 1w%");
 }
 
 #[test]
@@ -584,7 +584,7 @@ fn test_csv_ratelimit_header_row() {
     let entries = vec![];
     let result = format_sl_csv_ratelimit(&entries, Some("UTC"));
     let first_line = result.lines().next().expect("should have header line");
-    assert_eq!(first_line, "Time,5h%,7d%,5h Resets,7d Resets,Session");
+    assert_eq!(first_line, "Time,5h%,1w%,5h Resets,1w Resets,Session");
 }
 
 #[test]
@@ -597,7 +597,7 @@ fn test_csv_ratelimit_data_row() {
     assert_eq!(lines.len(), 2, "should have header + 1 data row");
     let data = lines[1];
     assert!(data.contains("30"), "should contain 5h%");
-    assert!(data.contains("50"), "should contain 7d%");
+    assert!(data.contains("50"), "should contain 1w%");
     assert!(data.contains("session-abc123"), "should contain full session id");
 }
 

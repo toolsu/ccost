@@ -1,7 +1,7 @@
 use cctokens::sl::types::*;
 use cctokens::sl::{
     aggregate_sessions, aggregate_ratelimit, aggregate_windows, aggregate_by_project,
-    aggregate_by_day,
+    aggregate_by_day, WindowType,
 };
 use chrono::{TimeZone, Utc};
 
@@ -250,7 +250,7 @@ fn test_window_aggregation_basic() {
     ];
 
     let sessions = aggregate_sessions(&records);
-    let windows = aggregate_windows(&records, &sessions);
+    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour);
 
     assert_eq!(windows.len(), 1);
     let w = &windows[0];
@@ -278,7 +278,7 @@ fn test_window_multiple_windows() {
     ];
 
     let sessions = aggregate_sessions(&records);
-    let windows = aggregate_windows(&records, &sessions);
+    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour);
 
     assert_eq!(windows.len(), 2);
 }
@@ -292,7 +292,7 @@ fn test_window_no_ratelimit_records_excluded() {
     ];
 
     let sessions = aggregate_sessions(&records);
-    let windows = aggregate_windows(&records, &sessions);
+    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour);
     assert_eq!(windows.len(), 0);
 }
 
@@ -305,7 +305,7 @@ fn test_window_zero_peak_pct_no_est_budget() {
     ];
 
     let sessions = aggregate_sessions(&records);
-    let windows = aggregate_windows(&records, &sessions);
+    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour);
     assert_eq!(windows.len(), 1);
     assert_eq!(windows[0].peak_five_hour_pct, 0);
     assert!(windows[0].est_budget.is_none(), "est_budget should be None when peak_pct=0");

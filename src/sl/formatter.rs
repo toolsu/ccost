@@ -272,9 +272,9 @@ pub fn format_sl_ratelimit_table(entries: &[SlRateLimitEntry], opts: &SlFormatOp
     let tz = opts.tz.as_deref();
 
     let headers: Vec<String> = if opts.compact {
-        vec!["Time".to_string(), "5h%".to_string(), "7d%".to_string(), "5h Resets".to_string()]
+        vec!["Time".to_string(), "5h%".to_string(), "1w%".to_string(), "5h Resets".to_string()]
     } else {
-        vec!["Time".to_string(), "5h%".to_string(), "7d%".to_string(), "5h Resets".to_string(), "Session".to_string()]
+        vec!["Time".to_string(), "5h%".to_string(), "1w%".to_string(), "5h Resets".to_string(), "Session".to_string()]
     };
 
     let rows: Vec<Vec<String>> = entries
@@ -306,7 +306,7 @@ pub fn format_sl_ratelimit_table(entries: &[SlRateLimitEntry], opts: &SlFormatOp
 
 /// Build unified headers for any sl --per view.
 ///
-/// Full:    [Label] | Cost | Duration | API Time | API% | Lines +/- | [count_label] | Peak 5h% | Peak 7d% | [extra_header]
+/// Full:    [Label] | Cost | Duration | API Time | API% | Lines +/- | [count_label] | Peak 5h% | Peak 1w% | [extra_header]
 /// Compact: [Label] | Cost | Duration | [count_label] | Peak 5h%
 fn unified_headers(label: &str, count_label: &str, compact: bool, extra_header: Option<&str>) -> Vec<String> {
     let mut headers = vec![label.to_string(), "Cost".to_string(), "Duration".to_string()];
@@ -319,7 +319,7 @@ fn unified_headers(label: &str, count_label: &str, compact: bool, extra_header: 
         headers.push("Lines +/-".to_string());
         headers.push(count_label.to_string());
         headers.push("Peak 5h%".to_string());
-        headers.push("Peak 7d%".to_string());
+        headers.push("Peak 1w%".to_string());
     }
     if let Some(extra) = extra_header {
         headers.push(extra.to_string());
@@ -479,10 +479,10 @@ pub fn format_sl_day_table(days: &[SlDaySummary], opts: &SlFormatOptions) -> Str
 // ─── Window table ─────────────────────────────────────────────────────────────
 
 /// Format window summaries as a table.
-pub fn format_sl_window_table(windows: &[SlWindowSummary], opts: &SlFormatOptions) -> String {
+pub fn format_sl_window_table(windows: &[SlWindowSummary], opts: &SlFormatOptions, window_label: &str) -> String {
     let tz = opts.tz.as_deref();
 
-    let headers = unified_headers("5h Window", "Sessions", opts.compact, Some("Est Budget"));
+    let headers = unified_headers(window_label, "Sessions", opts.compact, Some("Est Budget"));
 
     let rows: Vec<Vec<String>> = windows
         .iter()
@@ -674,7 +674,7 @@ pub fn format_sl_csv_ratelimit(entries: &[SlRateLimitEntry], tz: Option<&str>) -
     let mut output = String::new();
 
     // Header
-    output.push_str("Time,5h%,7d%,5h Resets,7d Resets,Session\n");
+    output.push_str("Time,5h%,1w%,5h Resets,1w Resets,Session\n");
 
     for e in entries {
         let row = csv_row(&[
@@ -846,7 +846,7 @@ mod tests {
         let result = format_sl_ratelimit_table(&entries, &opts);
         assert!(result.contains("Time"), "should contain Time header");
         assert!(result.contains("5h%"), "should contain 5h% header");
-        assert!(result.contains("7d%"), "should contain 7d% header");
+        assert!(result.contains("1w%"), "should contain 1w% header");
         assert!(result.contains("5h Resets"), "should contain 5h Resets header");
         assert!(result.contains("Session"), "should contain Session header");
     }
@@ -905,7 +905,7 @@ mod tests {
         assert!(result.contains("Lines +/-"), "should contain Lines +/- header");
         assert!(result.contains("Segs"), "should contain Segs header");
         assert!(result.contains("Peak 5h%"), "should contain Peak 5h% header");
-        assert!(result.contains("Peak 7d%"), "should contain Peak 7d% header");
+        assert!(result.contains("Peak 1w%"), "should contain Peak 1w% header");
     }
 
     #[test]
@@ -925,7 +925,7 @@ mod tests {
         assert!(result.contains("Segs"), "should contain Segs header");
         assert!(result.contains("Peak 5h%"), "should contain Peak 5h% header");
         assert!(!result.contains("API Time"), "compact should not contain API Time");
-        assert!(!result.contains("Peak 7d%"), "compact should not contain Peak 7d%");
+        assert!(!result.contains("Peak 1w%"), "compact should not contain Peak 1w%");
     }
 
     #[test]
@@ -1027,7 +1027,7 @@ mod tests {
         )];
         let result = format_sl_csv_ratelimit(&entries, Some("UTC"));
         let first_line = result.lines().next().unwrap();
-        assert_eq!(first_line, "Time,5h%,7d%,5h Resets,7d Resets,Session");
+        assert_eq!(first_line, "Time,5h%,1w%,5h Resets,1w Resets,Session");
     }
 
     #[test]
@@ -1039,7 +1039,7 @@ mod tests {
         let lines: Vec<&str> = result.lines().collect();
         assert_eq!(lines.len(), 2); // header + 1 data row
         assert!(lines[1].contains("30"), "should contain 5h%");
-        assert!(lines[1].contains("50"), "should contain 7d%");
+        assert!(lines[1].contains("50"), "should contain 1w%");
         assert!(lines[1].contains("session-abc123"), "should contain full session id");
     }
 

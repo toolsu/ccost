@@ -136,6 +136,14 @@ fn compute_segment_totals(
     (segments, total_cost, total_dur, total_api_dur, total_added, total_removed)
 }
 
+// ─── Window type enum ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowType {
+    FiveHour,
+    OneWeek,
+}
+
 // ─── Public aggregation functions ─────────────────────────────────────────────
 
 /// Group records by session_id and compute segment-aware summaries.
@@ -220,13 +228,16 @@ pub fn aggregate_ratelimit(records: &[SlRecord]) -> Vec<SlRateLimitEntry> {
     result
 }
 
-/// Group records by five_hour_resets_at and compute window summaries.
-pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary]) -> Vec<SlWindowSummary> {
-    // Only consider records that have five_hour_resets_at
-    // Group by five_hour_resets_at (using timestamp as key for BTreeMap ordering)
+/// Group records by rate-limit window (5h or 1w) and compute window summaries.
+pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary], window_type: WindowType) -> Vec<SlWindowSummary> {
+    // Group records by the appropriate resets_at field
     let mut by_window: BTreeMap<i64, Vec<&SlRecord>> = BTreeMap::new();
     for rec in records {
-        if let Some(resets_at) = rec.five_hour_resets_at {
+        let resets_at = match window_type {
+            WindowType::FiveHour => rec.five_hour_resets_at,
+            WindowType::OneWeek => rec.seven_day_resets_at,
+        };
+        if let Some(resets_at) = resets_at {
             by_window.entry(resets_at.timestamp()).or_default().push(rec);
         }
     }
@@ -234,7 +245,10 @@ pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary]) -
     let mut result = Vec::new();
     for (resets_ts, window_recs) in by_window {
         let window_end = Utc.timestamp_opt(resets_ts, 0).single().unwrap_or_default();
-        let window_start = window_end - Duration::hours(5);
+        let window_start = match window_type {
+            WindowType::FiveHour => window_end - Duration::hours(5),
+            WindowType::OneWeek => window_end - Duration::days(7),
+        };
 
         let peak_five_hour_pct = window_recs
             .iter()
@@ -273,8 +287,13 @@ pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary]) -
             total_lines_removed += removed;
         }
 
-        let est_budget = if peak_five_hour_pct > 0 {
-            Some(total_cost * 100.0 / (peak_five_hour_pct as f64))
+        // For 5h windows, use peak_five_hour_pct; for 1w windows, use peak_seven_day_pct
+        let est_budget_pct = match window_type {
+            WindowType::FiveHour => peak_five_hour_pct as u16,
+            WindowType::OneWeek => peak_seven_day_pct.unwrap_or(0) as u16,
+        };
+        let est_budget = if est_budget_pct > 0 {
+            Some(total_cost * 100.0 / (est_budget_pct as f64))
         } else {
             None
         };

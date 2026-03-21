@@ -124,12 +124,13 @@ pub enum SlViewMode {
     Session,
     Project,
     Day,
-    Window,
+    Window5h,
+    Window1w,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SlChartMode {
     FiveHour,
-    SevenDay,
+    OneWeek,
     Cost,
 }

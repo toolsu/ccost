@@ -16,6 +16,7 @@ use cctokens::sl::formatter::*;
 use cctokens::sl::{
     aggregate_by_day, aggregate_by_project, aggregate_ratelimit, aggregate_sessions,
     aggregate_windows, load_sl_records, SlChartMode, SlCostDiff, SlLoadOptions, SlViewMode,
+    WindowType,
 };
 use cctokens::utils::{compute_date_range, copy_to_clipboard, ext_for_format, term_width};
 use cctokens::*;
@@ -475,12 +476,13 @@ fn main() {
         .join("/");
 
     let table_mode = table_mode_str.as_deref().unwrap_or("auto");
+    let has_file_output = output_format.is_some() || filename_opt.is_some();
     let compact = match table_mode {
         "compact" => true,
         "full" => false,
         _ => {
-            // auto: compact if terminal width < 120
-            term_width() < 120
+            // auto: full when writing to file, compact if terminal width < 120
+            if has_file_output { false } else { term_width() < 120 }
         }
     };
 
@@ -670,9 +672,9 @@ Analyze Claude statusline data (rate limits, sessions, costs).
 
 Options:
   --file <path>         Path to statusline.jsonl (default: ~/.claude/statusline.jsonl)
-  --per <dim>           View dimension: session, project, day, window
+  --per <dim>           View dimension: session, project, day, 5h, 1w
                         Default (no --per): rate-limit timeline
-  --chart <mode>        Chart mode: 5h, 7d, cost
+  --chart <mode>        Chart mode: 5h, 1w, cost
   --cost-diff           Compare SL costs with LiteLLM pricing (requires --per session)
   --from <date>         Start date (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
   --to <date>           End date (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
@@ -714,10 +716,11 @@ fn run_sl(matches: &clap::ArgMatches) {
             "session" => SlViewMode::Session,
             "project" => SlViewMode::Project,
             "day" => SlViewMode::Day,
-            "window" => SlViewMode::Window,
+            "5h" => SlViewMode::Window5h,
+            "1w" => SlViewMode::Window1w,
             _ => {
                 errors.push(format!(
-                    "--per: invalid dimension '{}'. Valid: session, project, day, window",
+                    "--per: invalid dimension '{}'. Valid: session, project, day, 5h, 1w",
                     p
                 ));
                 SlViewMode::RateLimit
@@ -732,11 +735,11 @@ fn run_sl(matches: &clap::ArgMatches) {
     let chart_mode = if let Some(ref c) = chart_str {
         match c.as_str() {
             "5h" => Some(SlChartMode::FiveHour),
-            "7d" => Some(SlChartMode::SevenDay),
+            "1w" => Some(SlChartMode::OneWeek),
             "cost" => Some(SlChartMode::Cost),
             _ => {
                 errors.push(format!(
-                    "--chart: invalid mode '{}'. Valid: 5h, 7d, cost",
+                    "--chart: invalid mode '{}'. Valid: 5h, 1w, cost",
                     c
                 ));
                 None
@@ -920,15 +923,18 @@ fn run_sl(matches: &clap::ArgMatches) {
         eprintln!("Skipped {} malformed lines", skipped);
     }
 
+    let filename_opt = matches.get_one::<String>("filename").cloned();
+
     // Table mode
     let table_mode = table_mode_str.as_deref().unwrap_or("auto");
+    let has_file_output = output_format.is_some() || filename_opt.is_some();
     let compact = match table_mode {
         "compact" => true,
         "full" => false,
-        _ => term_width() < 120,
+        _ => {
+            if has_file_output { false } else { term_width() < 120 }
+        }
     };
-
-    let filename_opt = matches.get_one::<String>("filename").cloned();
 
     let fmt_opts = SlFormatOptions {
         tz: tz_opt.clone(),
@@ -952,7 +958,8 @@ fn run_sl(matches: &clap::ArgMatches) {
             SlViewMode::Session => "session".to_string(),
             SlViewMode::Project => "project".to_string(),
             SlViewMode::Day => "day".to_string(),
-            SlViewMode::Window => "window".to_string(),
+            SlViewMode::Window5h => "5h".to_string(),
+            SlViewMode::Window1w => "1w".to_string(),
         },
         from: effective_from.clone(),
         to: effective_to.clone(),
@@ -973,14 +980,14 @@ fn run_sl(matches: &clap::ArgMatches) {
                     let v: Vec<f64> = entries.iter().map(|e| e.five_hour_pct as f64).collect();
                     (k, v, "5-Hour Rate Limit %".to_string(), y_label_percent)
                 }
-                SlChartMode::SevenDay => {
+                SlChartMode::OneWeek => {
                     let entries = aggregate_ratelimit(&records);
                     let k: Vec<String> = entries
                         .iter()
                         .map(|e| fmt_dt(&e.ts, tz_opt.as_deref(), "%m-%dT%H:%M"))
                         .collect();
                     let v: Vec<f64> = entries.iter().map(|e| e.seven_day_pct as f64).collect();
-                    (k, v, "7-Day Rate Limit %".to_string(), y_label_percent)
+                    (k, v, "1-Week Rate Limit %".to_string(), y_label_percent)
                 }
                 SlChartMode::Cost => {
                     let sessions = aggregate_sessions(&records);
@@ -1067,9 +1074,14 @@ fn run_sl(matches: &clap::ArgMatches) {
                     let days = aggregate_by_day(&sessions, tz_opt.as_deref());
                     format_sl_json_days(&days, &json_meta)
                 }
-                SlViewMode::Window => {
+                SlViewMode::Window5h => {
                     let sessions = aggregate_sessions(recs);
-                    let windows = aggregate_windows(recs, &sessions);
+                    let windows = aggregate_windows(recs, &sessions, WindowType::FiveHour);
+                    format_sl_json_windows(&windows, &json_meta)
+                }
+                SlViewMode::Window1w => {
+                    let sessions = aggregate_sessions(recs);
+                    let windows = aggregate_windows(recs, &sessions, WindowType::OneWeek);
                     format_sl_json_windows(&windows, &json_meta)
                 }
             },
@@ -1160,10 +1172,15 @@ fn generate_sl_table_content(
             let days = aggregate_by_day(&sessions, opts.tz.as_deref());
             format_sl_day_table(&days, opts)
         }
-        SlViewMode::Window => {
+        SlViewMode::Window5h => {
             let sessions = aggregate_sessions(records);
-            let windows = aggregate_windows(records, &sessions);
-            format_sl_window_table(&windows, opts)
+            let windows = aggregate_windows(records, &sessions, WindowType::FiveHour);
+            format_sl_window_table(&windows, opts, "5h Window")
+        }
+        SlViewMode::Window1w => {
+            let sessions = aggregate_sessions(records);
+            let windows = aggregate_windows(records, &sessions, WindowType::OneWeek);
+            format_sl_window_table(&windows, opts, "1w Window")
         }
     }
 }
