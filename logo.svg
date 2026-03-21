@@ -1,0 +1,27 @@
+<svg version="1.1" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+ <rect width="512" height="512" rx="96" fill="#D4795A"/>
+ <g transform="translate(256 248)">
+  <path d="m-199.29-20.374v59.248a199.29 114.46 0 0 0 398.58 0v-59.248" fill="#8b4332" stroke-width="1.3466"/>
+  <path d="m-199.29-20.374v29.624a199.29 114.46 0 0 0 398.58 0v-29.624" fill="#a35540" stroke-width="1.3466"/>
+  <line x1="-175.05" x2="-177.74" y1="-17.681" y2="28.102" opacity=".4" stroke="#7a3a2a" stroke-width="1.5"/>
+  <line x1="-148.12" x2="-152.16" y1="-4.2155" y2="36.181" opacity=".4" stroke="#7a3a2a" stroke-width="1.5"/>
+  <line x1="-114.46" x2="-118.5" y1="6.5569" y2="41.567" opacity=".35" stroke="#7a3a2a" stroke-width="1.5"/>
+  <line x1="-74.06" x2="-76.753" y1="14.636" y2="44.26" opacity=".3" stroke="#7a3a2a" stroke-width="1.5"/>
+  <line x1="-33.664" x2="-33.664" y1="17.329" y2="45.607" opacity=".3" stroke="#7a3a2a" stroke-width="1.5"/>
+  <line x1="6.7327" x2="6.7327" y1="18.676" y2="45.607" opacity=".3" stroke="#7a3a2a" stroke-width="1.5"/>
+  <line x1="47.129" x2="47.129" y1="17.329" y2="44.26" opacity=".3" stroke="#7a3a2a" stroke-width="1.5"/>
+  <line x1="87.526" x2="90.219" y1="11.943" y2="42.914" opacity=".3" stroke="#7a3a2a" stroke-width="1.5"/>
+  <line x1="127.92" x2="131.96" y1="2.5173" y2="38.874" opacity=".35" stroke="#7a3a2a" stroke-width="1.5"/>
+  <line x1="161.59" x2="165.63" y1="-9.6016" y2="32.141" opacity=".4" stroke="#7a3a2a" stroke-width="1.5"/>
+  <line x1="188.52" x2="192.56" y1="-23.067" y2="22.715" opacity=".4" stroke="#7a3a2a" stroke-width="1.5"/>
+  <ellipse cy="-20.374" rx="199.29" ry="114.46" fill="#eab08e" stroke-width="1.3466"/>
+  <ellipse cx="-20.198" cy="-36.533" rx="175.05" ry="91.565" fill="#f2ceaf" opacity=".6" stroke-width="1.3466"/>
+  <ellipse cy="-20.374" rx="199.29" ry="114.46" fill="none" stroke="#c06040" stroke-width="5"/>
+  <ellipse cy="-20.374" rx="169.66" ry="96.951" fill="none" opacity=".6" stroke="#c06040" stroke-width="2.5"/>
+  <ellipse cy="-20.374" rx="150.81" ry="86.179" fill="none" opacity=".35" stroke="#c06040" stroke-dasharray="4, 4"/>
+  <g transform="matrix(1.3465 0 0 .77426 1.1865e-6 -20.374)" font-family="Georgia, 'Times New Roman', serif" font-size="105px" font-weight="700" letter-spacing="6" text-anchor="middle">
+   <text x="-2" y="20" fill="#9e4e35" opacity=".85">CC</text>
+   <text x="-4" y="18" fill="#c8775a" opacity=".35">CC</text>
+  </g>
+ </g>
+</svg>

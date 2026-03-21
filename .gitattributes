@@ -1,0 +1,24 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Rust
+*.rs text diff=rust
+*.toml text
+*.lock text -diff
+
+# Web
+*.html text diff=html
+*.css text diff=css
+*.js text diff=js
+*.json text
+
+# Documentation
+*.md text diff=markdown
+
+# Shell
+*.sh text eol=lf
+
+# Binary
+*.png binary
+*.jpg binary
+*.gif binary
