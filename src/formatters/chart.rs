@@ -182,7 +182,7 @@ fn x_label_for_granularity(key: &str, granularity: Granularity) -> String {
 }
 
 /// Format a y-axis label for cost mode.
-fn y_label_cost(val: f64) -> String {
+pub fn y_label_cost(val: f64) -> String {
     if val >= 1000.0 {
         format!("${}k", (val / 1000.0).round() as i64)
     } else if val >= 1.0 {
@@ -203,6 +203,11 @@ fn y_label_token(val: f64) -> String {
     } else {
         format!("{}", val.round() as i64)
     }
+}
+
+/// Format a y-axis percentage label (0-100%).
+pub fn y_label_percent(val: f64) -> String {
+    format!("{}%", val.round() as i64)
 }
 
 /// Core rendering logic for a braille chart given labels and values.
@@ -483,6 +488,205 @@ pub fn render_chart_from_records(
     let values: Vec<f64> = buckets.values().cloned().collect();
 
     render_chart_core(&keys, &values, options, granularity)
+}
+
+/// Render a braille chart from raw key-value pairs.
+/// Used by sl module for rate-limit and cost charts.
+pub fn render_chart_raw(
+    keys: &[String],
+    values: &[f64],
+    title: &str,
+    y_label_fn: fn(f64) -> String,
+    width: Option<usize>,
+    height: Option<usize>,
+) -> String {
+    if keys.is_empty() || values.is_empty() {
+        return "No data to chart.".to_string();
+    }
+
+    let max_val = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let min_val = 0.0_f64; // Always start from 0
+
+    let width = width.unwrap_or(80);
+    let braille_rows = height.unwrap_or(15);
+
+    // Generate y-axis label positions: top, bottom, and evenly spaced
+    let num_y_labels = braille_rows.min(6).max(2);
+    let mut y_positions: Vec<usize> = Vec::new();
+    for i in 0..num_y_labels {
+        let pos = if num_y_labels == 1 {
+            0
+        } else {
+            i * (braille_rows - 1) / (num_y_labels - 1)
+        };
+        y_positions.push(pos);
+    }
+    y_positions.sort();
+    y_positions.dedup();
+
+    // Calculate y-axis label values
+    let y_labels: Vec<(usize, String)> = y_positions
+        .iter()
+        .map(|&pos| {
+            let val = if braille_rows <= 1 {
+                max_val
+            } else {
+                max_val - (max_val - min_val) * pos as f64 / (braille_rows - 1) as f64
+            };
+            (pos, y_label_fn(val))
+        })
+        .collect();
+
+    let y_label_width = y_labels.iter().map(|(_, l)| l.len()).max().unwrap_or(0);
+
+    // Chart dimensions
+    let chart_cols = if width > y_label_width + 3 {
+        width - y_label_width - 3
+    } else {
+        10
+    };
+    let grid_width = chart_cols * 2;
+    let grid_height = braille_rows * 4;
+
+    // Map data points to grid coordinates
+    let data_points: Vec<(usize, usize)> = values
+        .iter()
+        .enumerate()
+        .map(|(i, &val)| {
+            let x = if values.len() <= 1 {
+                0
+            } else {
+                i * grid_width.saturating_sub(1) / (values.len() - 1)
+            };
+            let y = if max_val <= min_val {
+                grid_height.saturating_sub(1)
+            } else {
+                let normalized = (val - min_val) / (max_val - min_val);
+                let y_pos =
+                    ((1.0 - normalized) * (grid_height.saturating_sub(1)) as f64).round() as usize;
+                y_pos.min(grid_height.saturating_sub(1))
+            };
+            (x, y)
+        })
+        .collect();
+
+    // Initialize braille grid
+    let mut grid = vec![vec![0u8; grid_width]; grid_height];
+
+    // Draw lines between consecutive points using Bresenham's algorithm
+    for i in 0..data_points.len() {
+        let (x0, y0) = data_points[i];
+        // Plot the point itself
+        if x0 < grid_width && y0 < grid_height {
+            grid[y0][x0] = 1;
+        }
+
+        if i + 1 < data_points.len() {
+            let (x1, y1) = data_points[i + 1];
+            bresenham_line(&mut grid, x0, y0, x1, y1, grid_width, grid_height);
+        }
+    }
+
+    // Convert grid to braille characters
+    let mut braille_chars: Vec<Vec<char>> = vec![vec![' '; chart_cols]; braille_rows];
+
+    for br in 0..braille_rows {
+        for bc in 0..chart_cols {
+            let mut pattern: u8 = 0;
+            for dr in 0..4 {
+                for dc in 0..2 {
+                    let gy = br * 4 + dr;
+                    let gx = bc * 2 + dc;
+                    if gy < grid_height && gx < grid_width && grid[gy][gx] != 0 {
+                        pattern |= BRAILLE_DOT_MAP[dr][dc];
+                    }
+                }
+            }
+            if pattern != 0 {
+                braille_chars[br][bc] =
+                    char::from_u32(BRAILLE_BASE + pattern as u32).unwrap_or(' ');
+            }
+        }
+    }
+
+    // Build output
+    let mut output = String::new();
+
+    // Title
+    output.push_str(title);
+    output.push('\n');
+    output.push('\n');
+
+    // Build y-axis label map for quick lookup
+    let y_label_map: BTreeMap<usize, &str> = y_labels
+        .iter()
+        .map(|(pos, label)| (*pos, label.as_str()))
+        .collect();
+
+    // Chart rows
+    for br in 0..braille_rows {
+        // Y-axis label
+        let label = if let Some(label) = y_label_map.get(&br) {
+            format!("{:>width$}", label, width = y_label_width)
+        } else {
+            " ".repeat(y_label_width)
+        };
+        output.push_str(&label);
+        output.push_str(" \u{2524}"); // ┤
+        let row_str: String = braille_chars[br].iter().collect();
+        output.push_str(&row_str);
+        output.push('\n');
+    }
+
+    // X-axis border
+    output.push_str(&" ".repeat(y_label_width + 1));
+    output.push('\u{2514}'); // └
+    output.push_str(&"\u{2500}".repeat(chart_cols)); // ─
+    output.push('\n');
+
+    // X-axis labels — use keys directly (no granularity-based formatting)
+    let x_labels: Vec<&String> = keys.iter().collect();
+
+    // Auto-distribute labels across chart width
+    let mut label_line = vec![' '; chart_cols];
+    if !x_labels.is_empty() {
+        let num_labels = x_labels
+            .len()
+            .min(chart_cols / 8)
+            .max(2)
+            .min(x_labels.len());
+        let indices: Vec<usize> = if num_labels <= 1 {
+            vec![0]
+        } else {
+            (0..num_labels)
+                .map(|i| i * (x_labels.len() - 1) / (num_labels - 1))
+                .collect()
+        };
+
+        for &idx in &indices {
+            let label = x_labels[idx];
+            let pos = if x_labels.len() <= 1 {
+                0
+            } else {
+                idx * chart_cols.saturating_sub(1) / (x_labels.len() - 1)
+            };
+            // Place label at position, truncating if necessary
+            let start = pos.min(chart_cols);
+            for (j, ch) in label.chars().enumerate() {
+                let col = start + j;
+                if col < chart_cols {
+                    label_line[col] = ch;
+                }
+            }
+        }
+    }
+
+    output.push_str(&" ".repeat(y_label_width + 2));
+    let label_str: String = label_line.iter().collect();
+    output.push_str(label_str.trim_end());
+    output.push('\n');
+
+    output
 }
 
 /// Draw a line between two points on the grid using Bresenham's algorithm.
