@@ -167,6 +167,9 @@ pub fn aggregate_sessions(records: &[SlRecord]) -> Vec<SlSessionSummary> {
         let (segments, total_cost, total_dur, total_api_dur, total_added, total_removed) =
             compute_segment_totals(&recs);
 
+        let five_hour_pcts: Vec<u8> = recs.iter().filter_map(|r| r.five_hour_pct).collect();
+        let seven_day_pcts: Vec<u8> = recs.iter().filter_map(|r| r.seven_day_pct).collect();
+
         result.push(SlSessionSummary {
             session_id,
             project: first.project.clone(),
@@ -181,8 +184,10 @@ pub fn aggregate_sessions(records: &[SlRecord]) -> Vec<SlSessionSummary> {
             max_context_pct,
             first_ts: first.ts,
             last_ts: last.ts,
-            last_five_hour_pct: last.five_hour_pct,
-            last_seven_day_pct: last.seven_day_pct,
+            min_five_hour_pct: five_hour_pcts.iter().copied().min(),
+            max_five_hour_pct: five_hour_pcts.iter().copied().max(),
+            min_seven_day_pct: seven_day_pcts.iter().copied().min(),
+            max_seven_day_pct: seven_day_pcts.iter().copied().max(),
         });
     }
 
@@ -250,21 +255,18 @@ pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary], w
             WindowType::OneWeek => window_end - Duration::days(7),
         };
 
-        let peak_five_hour_pct = window_recs
-            .iter()
-            .filter_map(|r| r.five_hour_pct)
-            .max()
-            .unwrap_or(0);
+        let five_hour_pcts: Vec<u8> = window_recs.iter().filter_map(|r| r.five_hour_pct).collect();
+        let max_five_hour_pct = five_hour_pcts.iter().copied().max().unwrap_or(0);
+        let min_five_hour_pct = five_hour_pcts.iter().copied().min().unwrap_or(0);
 
         // Count unique sessions in this window
         let unique_sessions: HashSet<&str> = window_recs.iter().map(|r| r.session_id.as_str()).collect();
         let session_count = unique_sessions.len() as u32;
 
-        // Track peak 7d%
-        let peak_seven_day_pct = window_recs
-            .iter()
-            .filter_map(|r| r.seven_day_pct)
-            .max();
+        // Track min/max 7d%
+        let seven_day_pcts: Vec<u8> = window_recs.iter().filter_map(|r| r.seven_day_pct).collect();
+        let max_seven_day_pct = seven_day_pcts.iter().copied().max();
+        let min_seven_day_pct = seven_day_pcts.iter().copied().min();
 
         // Mini segment detection per session within window
         let mut by_session_window: BTreeMap<&str, Vec<&SlRecord>> = BTreeMap::new();
@@ -287,13 +289,17 @@ pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary], w
             total_lines_removed += removed;
         }
 
-        // For 5h windows, use peak_five_hour_pct; for 1w windows, use peak_seven_day_pct
-        let est_budget_pct = match window_type {
-            WindowType::FiveHour => peak_five_hour_pct as u16,
-            WindowType::OneWeek => peak_seven_day_pct.unwrap_or(0) as u16,
+        // Use delta (max - min) for budget estimation: cost / delta% * 100
+        let delta_pct = match window_type {
+            WindowType::FiveHour => max_five_hour_pct.saturating_sub(min_five_hour_pct) as u16,
+            WindowType::OneWeek => {
+                let max = max_seven_day_pct.unwrap_or(0);
+                let min = min_seven_day_pct.unwrap_or(0);
+                max.saturating_sub(min) as u16
+            }
         };
-        let est_budget = if est_budget_pct > 0 {
-            Some(total_cost * 100.0 / (est_budget_pct as f64))
+        let est_budget = if delta_pct > 0 {
+            Some(total_cost * 100.0 / (delta_pct as f64))
         } else {
             None
         };
@@ -301,7 +307,8 @@ pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary], w
         result.push(SlWindowSummary {
             window_start,
             window_end,
-            peak_five_hour_pct,
+            min_five_hour_pct,
+            max_five_hour_pct,
             sessions: session_count,
             total_cost,
             est_budget,
@@ -309,7 +316,8 @@ pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary], w
             total_api_duration_ms,
             total_lines_added,
             total_lines_removed,
-            peak_seven_day_pct,
+            min_seven_day_pct,
+            max_seven_day_pct,
         });
     }
 
@@ -329,8 +337,10 @@ pub fn aggregate_by_project(sessions: &[SlSessionSummary]) -> Vec<SlProjectSumma
             session_count: 0,
             total_lines_added: 0,
             total_lines_removed: 0,
-            peak_five_hour_pct: None,
-            peak_seven_day_pct: None,
+            min_five_hour_pct: None,
+            max_five_hour_pct: None,
+            min_seven_day_pct: None,
+            max_seven_day_pct: None,
         });
         entry.total_cost += s.total_cost;
         entry.total_duration_ms += s.total_duration_ms;
@@ -338,14 +348,26 @@ pub fn aggregate_by_project(sessions: &[SlSessionSummary]) -> Vec<SlProjectSumma
         entry.session_count += 1;
         entry.total_lines_added += s.total_lines_added;
         entry.total_lines_removed += s.total_lines_removed;
-        if let Some(pct) = s.last_five_hour_pct {
-            entry.peak_five_hour_pct = Some(match entry.peak_five_hour_pct {
+        if let Some(pct) = s.min_five_hour_pct {
+            entry.min_five_hour_pct = Some(match entry.min_five_hour_pct {
+                Some(existing) => existing.min(pct),
+                None => pct,
+            });
+        }
+        if let Some(pct) = s.max_five_hour_pct {
+            entry.max_five_hour_pct = Some(match entry.max_five_hour_pct {
                 Some(existing) => existing.max(pct),
                 None => pct,
             });
         }
-        if let Some(pct) = s.last_seven_day_pct {
-            entry.peak_seven_day_pct = Some(match entry.peak_seven_day_pct {
+        if let Some(pct) = s.min_seven_day_pct {
+            entry.min_seven_day_pct = Some(match entry.min_seven_day_pct {
+                Some(existing) => existing.min(pct),
+                None => pct,
+            });
+        }
+        if let Some(pct) = s.max_seven_day_pct {
+            entry.max_seven_day_pct = Some(match entry.max_seven_day_pct {
                 Some(existing) => existing.max(pct),
                 None => pct,
             });
@@ -368,8 +390,10 @@ pub fn aggregate_by_day(sessions: &[SlSessionSummary], tz: Option<&str>) -> Vec<
             date,
             total_cost: 0.0,
             session_count: 0,
-            peak_five_hour_pct: None,
-            peak_seven_day_pct: None,
+            min_five_hour_pct: None,
+            max_five_hour_pct: None,
+            min_seven_day_pct: None,
+            max_seven_day_pct: None,
             total_duration_ms: 0,
             total_api_duration_ms: 0,
             total_lines_added: 0,
@@ -383,15 +407,26 @@ pub fn aggregate_by_day(sessions: &[SlSessionSummary], tz: Option<&str>) -> Vec<
         entry.total_lines_added += s.total_lines_added;
         entry.total_lines_removed += s.total_lines_removed;
 
-        // Update peak percentages
-        if let Some(pct) = s.last_five_hour_pct {
-            entry.peak_five_hour_pct = Some(match entry.peak_five_hour_pct {
+        if let Some(pct) = s.min_five_hour_pct {
+            entry.min_five_hour_pct = Some(match entry.min_five_hour_pct {
+                Some(existing) => existing.min(pct),
+                None => pct,
+            });
+        }
+        if let Some(pct) = s.max_five_hour_pct {
+            entry.max_five_hour_pct = Some(match entry.max_five_hour_pct {
                 Some(existing) => existing.max(pct),
                 None => pct,
             });
         }
-        if let Some(pct) = s.last_seven_day_pct {
-            entry.peak_seven_day_pct = Some(match entry.peak_seven_day_pct {
+        if let Some(pct) = s.min_seven_day_pct {
+            entry.min_seven_day_pct = Some(match entry.min_seven_day_pct {
+                Some(existing) => existing.min(pct),
+                None => pct,
+            });
+        }
+        if let Some(pct) = s.max_seven_day_pct {
+            entry.max_seven_day_pct = Some(match entry.max_seven_day_pct {
                 Some(existing) => existing.max(pct),
                 None => pct,
             });

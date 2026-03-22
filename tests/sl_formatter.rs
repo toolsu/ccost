@@ -1,6 +1,6 @@
-use cctokens::sl::types::*;
-use cctokens::sl::formatter::*;
-use cctokens::types::PriceMode;
+use ccost::sl::types::*;
+use ccost::sl::formatter::*;
+use ccost::types::PriceMode;
 use chrono::{TimeZone, Utc};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -48,8 +48,10 @@ fn make_session_summary(
         max_context_pct,
         first_ts: Utc.timestamp_opt(1_774_483_200, 0).single().unwrap(),
         last_ts: Utc.timestamp_opt(1_774_483_200 + 3600, 0).single().unwrap(),
-        last_five_hour_pct: Some(30),
-        last_seven_day_pct: Some(50),
+        min_five_hour_pct: Some(30),
+        max_five_hour_pct: Some(30),
+        min_seven_day_pct: Some(50),
+        max_seven_day_pct: Some(50),
     }
 }
 
@@ -269,11 +271,10 @@ fn test_session_table_full_headers() {
     assert!(result.contains("Cost"), "should contain Cost");
     assert!(result.contains("Duration"), "should contain Duration");
     assert!(result.contains("API Time"), "should contain API Time");
-    assert!(result.contains("API%"), "should contain API%");
     assert!(result.contains("Lines +/-"), "should contain Lines +/-");
     assert!(result.contains("Segs"), "should contain Segs");
-    assert!(result.contains("Peak 5h%"), "should contain Peak 5h%");
-    assert!(result.contains("Peak 1w%"), "should contain Peak 1w%");
+    assert!(result.contains("5h%"), "should contain 5h%");
+    assert!(result.contains("1w%"), "should contain 1w%");
 }
 
 #[test]
@@ -292,59 +293,10 @@ fn test_session_table_compact_headers() {
     assert!(result.contains("Session"), "should contain Session");
     assert!(result.contains("Cost"), "should contain Cost");
     assert!(result.contains("Segs"), "should contain Segs");
-    assert!(result.contains("Peak 5h%"), "should contain Peak 5h%");
+    assert!(result.contains("5h%"), "should contain 5h%");
     // Columns hidden in compact mode
     assert!(!result.contains("API Time"), "compact should not have API Time");
-    assert!(!result.contains("API%"), "compact should not have API%");
-    assert!(!result.contains("Peak 1w%"), "compact should not have Peak 1w%");
-}
-
-#[test]
-fn test_session_table_api_percent_calculation() {
-    // duration = 4000ms, api_duration = 1000ms → API% = 25%
-    let sessions = vec![make_session_summary(
-        "abc123", "/proj/a", 0.1, 4_000, 1_000, 0, 0, None, 1,
-    )];
-    let opts = SlFormatOptions {
-        tz: Some("UTC".to_string()),
-        price_mode: PriceMode::Decimal,
-        compact: false,
-        color: false,
-    };
-    let result = format_sl_session_table(&sessions, &opts);
-    assert!(result.contains("25%"), "should contain 25% API ratio");
-}
-
-#[test]
-fn test_session_table_api_percent_50() {
-    // duration = 3600s, api_duration = 1800s → API% = 50%
-    let sessions = vec![make_session_summary(
-        "abc123", "/home/user/foo/bar", 0.50, 3_600_000, 1_800_000, 100, 50, Some(75), 2,
-    )];
-    let opts = SlFormatOptions {
-        tz: Some("UTC".to_string()),
-        price_mode: PriceMode::Decimal,
-        compact: false,
-        color: false,
-    };
-    let result = format_sl_session_table(&sessions, &opts);
-    assert!(result.contains("50%"), "should contain 50% API ratio");
-}
-
-#[test]
-fn test_session_table_zero_duration_api_pct_em_dash() {
-    let sessions = vec![make_session_summary(
-        "abc123", "/proj/a", 0.0, 0, 0, 0, 0, None, 1,
-    )];
-    let opts = SlFormatOptions {
-        tz: Some("UTC".to_string()),
-        price_mode: PriceMode::Decimal,
-        compact: false,
-        color: false,
-    };
-    let result = format_sl_session_table(&sessions, &opts);
-    // Em dash for undefined API%
-    assert!(result.contains('\u{2014}'), "zero duration should show em dash for API%");
+    assert!(!result.contains("1w%"), "compact should not have 1w%");
 }
 
 #[test]
@@ -389,7 +341,7 @@ fn test_session_table_peak_pct_shown() {
         color: false,
     };
     let result = format_sl_session_table(&sessions, &opts);
-    // make_session_summary sets last_five_hour_pct=30, last_seven_day_pct=50
+    // make_session_summary sets min/max_five_hour_pct=30, min/max_seven_day_pct=50
     assert!(result.contains("30%"), "should show peak 5h%");
     assert!(result.contains("50%"), "should show peak 1w%");
 }
@@ -515,7 +467,8 @@ fn test_json_windows_structure() {
     let windows = vec![SlWindowSummary {
         window_start: Utc.timestamp_opt(1_774_483_200, 0).single().unwrap(),
         window_end: Utc.timestamp_opt(1_774_500_000, 0).single().unwrap(),
-        peak_five_hour_pct: 45,
+        min_five_hour_pct: 45,
+        max_five_hour_pct: 45,
         sessions: 3,
         total_cost: 1.23,
         est_budget: Some(2.73),
@@ -523,14 +476,15 @@ fn test_json_windows_structure() {
         total_api_duration_ms: 2000,
         total_lines_added: 10,
         total_lines_removed: 5,
-        peak_seven_day_pct: Some(60),
+        min_seven_day_pct: Some(60),
+        max_seven_day_pct: Some(60),
     }];
     let meta = make_json_meta("windows");
     let result = format_sl_json_windows(&windows, &meta);
     let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
 
     assert!(parsed["data"].is_array());
-    assert_eq!(parsed["data"][0]["peakFiveHourPct"], 45);
+    assert_eq!(parsed["data"][0]["minFiveHourPct"], 45);
     assert_eq!(parsed["data"][0]["sessions"], 3);
 }
 
@@ -544,8 +498,10 @@ fn test_json_projects_structure() {
         session_count: 4,
         total_lines_added: 20,
         total_lines_removed: 8,
-        peak_five_hour_pct: Some(40),
-        peak_seven_day_pct: Some(70),
+        min_five_hour_pct: Some(40),
+        max_five_hour_pct: Some(40),
+        min_seven_day_pct: Some(70),
+        max_seven_day_pct: Some(70),
     }];
     let meta = make_json_meta("projects");
     let result = format_sl_json_projects(&projects, &meta);
@@ -561,8 +517,10 @@ fn test_json_days_structure() {
         date: "2026-03-26".to_string(),
         total_cost: 1.5,
         session_count: 5,
-        peak_five_hour_pct: Some(60),
-        peak_seven_day_pct: Some(80),
+        min_five_hour_pct: Some(60),
+        max_five_hour_pct: Some(60),
+        min_seven_day_pct: Some(80),
+        max_seven_day_pct: Some(80),
         total_duration_ms: 7_200_000,
         total_api_duration_ms: 3_600_000,
         total_lines_added: 50,
@@ -626,7 +584,7 @@ fn test_csv_sessions_header_row() {
     let first_line = result.lines().next().expect("should have header line");
     assert!(first_line.contains("Session"), "header should contain Session");
     assert!(first_line.contains("Cost"), "header should contain Cost");
-    assert!(first_line.contains("API%"), "header should contain API%");
+    assert!(first_line.contains("API Time"), "header should contain API Time");
     assert!(first_line.contains("Lines Added"), "header should contain Lines Added");
 }
 
@@ -653,20 +611,3 @@ fn test_csv_sessions_data_row() {
     assert!(data.contains('2'.to_string().as_str()), "should contain segments");
 }
 
-#[test]
-fn test_csv_sessions_api_pct_calculation() {
-    // duration = 4000ms, api = 1000ms → api% = 25.0
-    let sessions = vec![make_session_summary(
-        "s1", "/proj/a", 0.0, 4_000, 1_000, 0, 0, None, 1,
-    )];
-    let opts = SlFormatOptions {
-        tz: Some("UTC".to_string()),
-        price_mode: PriceMode::Decimal,
-        compact: false,
-        color: false,
-    };
-    let result = format_sl_csv_sessions(&sessions, &opts);
-    let lines: Vec<&str> = result.lines().collect();
-    let data = lines[1];
-    assert!(data.contains("25.0"), "api% should be 25.0");
-}

@@ -99,19 +99,34 @@ fn create_test_file() -> NamedTempFile {
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
 fn sl_cmd() -> Command {
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-/// 1. Default sl view (rate-limit timeline) should show 5h% and 1w% columns.
+/// 1. Default sl view should show session table (unified columns).
 #[test]
-fn test_sl_default_ratelimit() {
+fn test_sl_default_shows_5h() {
     let f = create_test_file();
     let path = f.path().to_str().unwrap();
 
     sl_cmd()
         .args(["sl", "--file", path])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("5h Window"))
+        .stdout(predicate::str::contains("Cost"))
+        .stdout(predicate::str::contains("Duration"));
+}
+
+/// 1b. --per action shows rate-limit timeline with 5h% and 1w% columns.
+#[test]
+fn test_sl_per_action() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "action"])
         .assert()
         .success()
         .stdout(predicate::str::contains("5h%"))
@@ -140,7 +155,7 @@ fn test_sl_per_session() {
         .stdout(predicate::str::contains("$2.50"));
 }
 
-/// 3. --per window shows "Peak 5h%" and "Est Budget" column headers.
+/// 3. --per window shows "5h%" and "Est Budget" column headers.
 #[test]
 fn test_sl_per_window() {
     let f = create_test_file();
@@ -150,7 +165,7 @@ fn test_sl_per_window() {
         .args(["sl", "--file", path, "--per", "5h", "--cost", "decimal"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Peak 5h%"))
+        .stdout(predicate::str::contains("5h%"))
         .stdout(predicate::str::contains("Est Budget"));
 }
 
@@ -168,7 +183,7 @@ fn test_sl_chart_5h() {
 }
 
 /// 5. --per session --output json --filename /dev/stdout emits valid JSON
-///    with meta.source = "cctokens-sl" and a "data" array.
+///    with meta.source = "ccost-sl" and a "data" array.
 #[test]
 fn test_sl_json_output() {
     let f = create_test_file();
@@ -192,8 +207,8 @@ fn test_sl_json_output() {
 
     assert_eq!(
         parsed["meta"]["source"].as_str().unwrap_or(""),
-        "cctokens-sl",
-        "meta.source should be 'cctokens-sl'"
+        "ccost-sl",
+        "meta.source should be 'ccost-sl'"
     );
 
     assert!(

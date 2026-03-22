@@ -149,7 +149,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cctokens"
+name = "ccost"
 version = "1.0.0"
 dependencies = [
  "assert_cmd",

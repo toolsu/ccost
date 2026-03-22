@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>cctokens report</title>
+<title>ccost report</title>
 <style>
 * {
   margin: 0;
@@ -51,6 +51,9 @@ thead th {
 thead th:hover {
   background: #3a3530;
 }
+tbody, tfoot {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+}
 tbody tr.parent {
   background: #222;
 }
@@ -79,7 +82,7 @@ tfoot tr.totals-child td:first-child {
   padding-left: 2rem;
 }
 .cost {
-  color: #888;
+  color: #6ee7b7;
   font-size: 0.85em;
 }
 .sort-arrow {
@@ -103,366 +106,552 @@ th.sort-desc .arrow-down {
 </style>
 </head>
 <body>
-<h1><a href="https://github.com/tomchen/cctokens">cctokens report</a></h1>
+<h1><a href="https://github.com/toolsu/ccost">ccost report</a></h1>
 <table>
 <thead>
 <tr>
-<th class="sortable" data-col="0">Date/Model<span class="sort-arrow"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 0L12 6H0z" class="arrow-up"/><path d="M6 12L0 6h12z" class="arrow-down"/></svg></span></th>
-<th class="sortable" data-col="1">Input Total<span class="sort-arrow"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 0L12 6H0z" class="arrow-up"/><path d="M6 12L0 6h12z" class="arrow-down"/></svg></span></th>
-<th class="sortable" data-col="2">Output<span class="sort-arrow"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 0L12 6H0z" class="arrow-up"/><path d="M6 12L0 6h12z" class="arrow-down"/></svg></span></th>
-<th class="sortable" data-col="3">Total<span class="sort-arrow"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 0L12 6H0z" class="arrow-up"/><path d="M6 12L0 6h12z" class="arrow-down"/></svg></span></th>
+<th class="sortable" data-col="0">Date/Model<span class="sort-arrow"><svg width="12" height="14" viewBox="0 0 12 14"><path d="M6 0L12 6H0z" class="arrow-up"/><path d="M6 14L0 8h12z" class="arrow-down"/></svg></span></th>
+<th class="sortable" data-col="1">Input<span class="sort-arrow"><svg width="12" height="14" viewBox="0 0 12 14"><path d="M6 0L12 6H0z" class="arrow-up"/><path d="M6 14L0 8h12z" class="arrow-down"/></svg></span></th>
+<th class="sortable" data-col="2">Cache Creation<span class="sort-arrow"><svg width="12" height="14" viewBox="0 0 12 14"><path d="M6 0L12 6H0z" class="arrow-up"/><path d="M6 14L0 8h12z" class="arrow-down"/></svg></span></th>
+<th class="sortable" data-col="3">Cache Read<span class="sort-arrow"><svg width="12" height="14" viewBox="0 0 12 14"><path d="M6 0L12 6H0z" class="arrow-up"/><path d="M6 14L0 8h12z" class="arrow-down"/></svg></span></th>
+<th class="sortable" data-col="4">Input Total<span class="sort-arrow"><svg width="12" height="14" viewBox="0 0 12 14"><path d="M6 0L12 6H0z" class="arrow-up"/><path d="M6 14L0 8h12z" class="arrow-down"/></svg></span></th>
+<th class="sortable" data-col="5">Output<span class="sort-arrow"><svg width="12" height="14" viewBox="0 0 12 14"><path d="M6 0L12 6H0z" class="arrow-up"/><path d="M6 14L0 8h12z" class="arrow-down"/></svg></span></th>
+<th class="sortable" data-col="6">Total<span class="sort-arrow"><svg width="12" height="14" viewBox="0 0 12 14"><path d="M6 0L12 6H0z" class="arrow-up"/><path d="M6 14L0 8h12z" class="arrow-down"/></svg></span></th>
 </tr>
 </thead>
 <tbody>
 <tr class="parent">
 <td>2026-03-09</td>
+<td>2.6K <span class="cost">($0)</span></td>
+<td>317.7K <span class="cost">($2)</span></td>
+<td>6.19M <span class="cost">($3)</span></td>
 <td>6.51M <span class="cost">($5)</span></td>
 <td>66.9K <span class="cost">($2)</span></td>
 <td>6.58M <span class="cost">($7)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>18 <span class="cost">($0)</span></td>
+<td>20.6K <span class="cost">($0)</span></td>
+<td>42.7K <span class="cost">($0)</span></td>
 <td>63.4K <span class="cost">($0)</span></td>
 <td>1.4K <span class="cost">($0)</span></td>
 <td>64.8K <span class="cost">($0)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>2.6K <span class="cost">($0)</span></td>
+<td>297.1K <span class="cost">($2)</span></td>
+<td>6.15M <span class="cost">($3)</span></td>
 <td>6.45M <span class="cost">($5)</span></td>
 <td>65.4K <span class="cost">($2)</span></td>
 <td>6.52M <span class="cost">($7)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-10</td>
+<td>6.8K <span class="cost">($0)</span></td>
+<td>4.06M <span class="cost">($14)</span></td>
+<td>115.29M <span class="cost">($45)</span></td>
 <td>119.36M <span class="cost">($58)</span></td>
 <td>775.9K <span class="cost">($13)</span></td>
 <td>120.14M <span class="cost">($71)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>3.0K <span class="cost">($0)</span></td>
+<td>2.37M <span class="cost">($3)</span></td>
+<td>31.92M <span class="cost">($3)</span></td>
 <td>34.29M <span class="cost">($6)</span></td>
 <td>333.6K <span class="cost">($2)</span></td>
 <td>34.62M <span class="cost">($8)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>3.9K <span class="cost">($0)</span></td>
+<td>1.69M <span class="cost">($11)</span></td>
+<td>83.37M <span class="cost">($42)</span></td>
 <td>85.07M <span class="cost">($52)</span></td>
 <td>442.3K <span class="cost">($11)</span></td>
 <td>85.51M <span class="cost">($63)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-11</td>
+<td>30.7K <span class="cost">($0)</span></td>
+<td>1.45M <span class="cost">($9)</span></td>
+<td>41.46M <span class="cost">($21)</span></td>
 <td>42.94M <span class="cost">($30)</span></td>
 <td>387.1K <span class="cost">($10)</span></td>
 <td>43.33M <span class="cost">($40)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>30.7K <span class="cost">($0)</span></td>
+<td>1.45M <span class="cost">($9)</span></td>
+<td>41.46M <span class="cost">($21)</span></td>
 <td>42.94M <span class="cost">($30)</span></td>
 <td>387.1K <span class="cost">($10)</span></td>
 <td>43.33M <span class="cost">($40)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-12</td>
+<td>23.6K <span class="cost">($0)</span></td>
+<td>1.64M <span class="cost">($9)</span></td>
+<td>25.81M <span class="cost">($12)</span></td>
 <td>27.47M <span class="cost">($21)</span></td>
 <td>375.3K <span class="cost">($9)</span></td>
 <td>27.85M <span class="cost">($30)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>8.5K <span class="cost">($0)</span></td>
+<td>219.5K <span class="cost">($0)</span></td>
+<td>3.06M <span class="cost">($0)</span></td>
 <td>3.28M <span class="cost">($1)</span></td>
 <td>22.4K <span class="cost">($0)</span></td>
 <td>3.31M <span class="cost">($1)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>15.1K <span class="cost">($0)</span></td>
+<td>1.42M <span class="cost">($9)</span></td>
+<td>22.75M <span class="cost">($11)</span></td>
 <td>24.19M <span class="cost">($20)</span></td>
 <td>352.8K <span class="cost">($9)</span></td>
 <td>24.54M <span class="cost">($29)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-13</td>
+<td>24.8K <span class="cost">($0)</span></td>
+<td>1.83M <span class="cost">($11)</span></td>
+<td>23.07M <span class="cost">($12)</span></td>
 <td>24.92M <span class="cost">($23)</span></td>
 <td>422.6K <span class="cost">($11)</span></td>
 <td>25.34M <span class="cost">($34)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>24.8K <span class="cost">($0)</span></td>
+<td>1.83M <span class="cost">($11)</span></td>
+<td>23.07M <span class="cost">($12)</span></td>
 <td>24.92M <span class="cost">($23)</span></td>
 <td>422.6K <span class="cost">($11)</span></td>
 <td>25.34M <span class="cost">($34)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-14</td>
+<td>253 <span class="cost">($0)</span></td>
+<td>295.5K <span class="cost">($2)</span></td>
+<td>18.95M <span class="cost">($9)</span></td>
 <td>19.25M <span class="cost">($11)</span></td>
 <td>128.7K <span class="cost">($3)</span></td>
 <td>19.37M <span class="cost">($15)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>253 <span class="cost">($0)</span></td>
+<td>295.5K <span class="cost">($2)</span></td>
+<td>18.95M <span class="cost">($9)</span></td>
 <td>19.25M <span class="cost">($11)</span></td>
 <td>128.7K <span class="cost">($3)</span></td>
 <td>19.37M <span class="cost">($15)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-15</td>
+<td>474 <span class="cost">($0)</span></td>
+<td>1.69M <span class="cost">($10)</span></td>
+<td>52.75M <span class="cost">($26)</span></td>
 <td>54.44M <span class="cost">($37)</span></td>
 <td>708.7K <span class="cost">($17)</span></td>
 <td>55.14M <span class="cost">($54)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>468 <span class="cost">($0)</span></td>
+<td>1.63M <span class="cost">($10)</span></td>
+<td>52.75M <span class="cost">($26)</span></td>
 <td>54.38M <span class="cost">($37)</span></td>
 <td>656.9K <span class="cost">($16)</span></td>
 <td>55.04M <span class="cost">($53)</span></td>
 </tr>
 <tr class="child">
 <td>└─ sonnet-4-6</td>
+<td>6 <span class="cost">($0)</span></td>
+<td>51.5K <span class="cost">($0)</span></td>
+<td>0 <span class="cost">($0)</span></td>
 <td>51.5K <span class="cost">($0)</span></td>
 <td>51.7K <span class="cost">($1)</span></td>
 <td>103.2K <span class="cost">($1)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-16</td>
+<td>56.4K <span class="cost">($0)</span></td>
+<td>1.57M <span class="cost">($9)</span></td>
+<td>123.38M <span class="cost">($61)</span></td>
 <td>125.01M <span class="cost">($71)</span></td>
 <td>479.9K <span class="cost">($12)</span></td>
 <td>125.49M <span class="cost">($82)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>6.2K <span class="cost">($0)</span></td>
+<td>155.4K <span class="cost">($0)</span></td>
+<td>847.7K <span class="cost">($0)</span></td>
 <td>1.01M <span class="cost">($0)</span></td>
 <td>12.5K <span class="cost">($0)</span></td>
 <td>1.02M <span class="cost">($0)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>50.2K <span class="cost">($0)</span></td>
+<td>1.42M <span class="cost">($9)</span></td>
+<td>122.53M <span class="cost">($61)</span></td>
 <td>124.00M <span class="cost">($70)</span></td>
 <td>467.4K <span class="cost">($12)</span></td>
 <td>124.47M <span class="cost">($82)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-17</td>
+<td>9.9K <span class="cost">($0)</span></td>
+<td>2.39M <span class="cost">($12)</span></td>
+<td>136.73M <span class="cost">($67)</span></td>
 <td>139.12M <span class="cost">($79)</span></td>
 <td>500.3K <span class="cost">($12)</span></td>
 <td>139.62M <span class="cost">($90)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>2.1K <span class="cost">($0)</span></td>
+<td>622.2K <span class="cost">($1)</span></td>
+<td>3.73M <span class="cost">($0)</span></td>
 <td>4.35M <span class="cost">($1)</span></td>
 <td>45.7K <span class="cost">($0)</span></td>
 <td>4.40M <span class="cost">($1)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>7.8K <span class="cost">($0)</span></td>
+<td>1.76M <span class="cost">($11)</span></td>
+<td>133.00M <span class="cost">($67)</span></td>
 <td>134.77M <span class="cost">($78)</span></td>
 <td>454.6K <span class="cost">($11)</span></td>
 <td>135.23M <span class="cost">($89)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-18</td>
+<td>5.7K <span class="cost">($0)</span></td>
+<td>1.37M <span class="cost">($7)</span></td>
+<td>66.88M <span class="cost">($33)</span></td>
 <td>68.25M <span class="cost">($40)</span></td>
 <td>295.2K <span class="cost">($7)</span></td>
 <td>68.55M <span class="cost">($47)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>193 <span class="cost">($0)</span></td>
+<td>323.6K <span class="cost">($0)</span></td>
+<td>1.19M <span class="cost">($0)</span></td>
 <td>1.51M <span class="cost">($1)</span></td>
 <td>31.5K <span class="cost">($0)</span></td>
 <td>1.54M <span class="cost">($1)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>5.5K <span class="cost">($0)</span></td>
+<td>1.05M <span class="cost">($7)</span></td>
+<td>65.69M <span class="cost">($33)</span></td>
 <td>66.74M <span class="cost">($39)</span></td>
 <td>263.7K <span class="cost">($7)</span></td>
 <td>67.01M <span class="cost">($46)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-19</td>
+<td>4.4K <span class="cost">($0)</span></td>
+<td>1.19M <span class="cost">($6)</span></td>
+<td>46.17M <span class="cost">($22)</span></td>
 <td>47.36M <span class="cost">($29)</span></td>
 <td>318.1K <span class="cost">($8)</span></td>
 <td>47.68M <span class="cost">($36)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>892 <span class="cost">($0)</span></td>
+<td>234.2K <span class="cost">($0)</span></td>
+<td>1.72M <span class="cost">($0)</span></td>
 <td>1.96M <span class="cost">($0)</span></td>
 <td>15.9K <span class="cost">($0)</span></td>
 <td>1.98M <span class="cost">($1)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>3.5K <span class="cost">($0)</span></td>
+<td>956.6K <span class="cost">($6)</span></td>
+<td>44.45M <span class="cost">($22)</span></td>
 <td>45.41M <span class="cost">($28)</span></td>
 <td>302.2K <span class="cost">($8)</span></td>
 <td>45.71M <span class="cost">($36)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-20</td>
+<td>5.2K <span class="cost">($0)</span></td>
+<td>1.02M <span class="cost">($6)</span></td>
+<td>163.67M <span class="cost">($81)</span></td>
 <td>164.69M <span class="cost">($87)</span></td>
 <td>199.9K <span class="cost">($5)</span></td>
 <td>164.89M <span class="cost">($92)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>3.6K <span class="cost">($0)</span></td>
+<td>138.1K <span class="cost">($0)</span></td>
+<td>1.02M <span class="cost">($0)</span></td>
 <td>1.16M <span class="cost">($0)</span></td>
 <td>6.9K <span class="cost">($0)</span></td>
 <td>1.16M <span class="cost">($0)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>1.6K <span class="cost">($0)</span></td>
+<td>878.4K <span class="cost">($5)</span></td>
+<td>162.65M <span class="cost">($81)</span></td>
 <td>163.53M <span class="cost">($87)</span></td>
 <td>193.0K <span class="cost">($5)</span></td>
 <td>163.73M <span class="cost">($92)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-21</td>
+<td>53.3K <span class="cost">($0)</span></td>
+<td>7.29M <span class="cost">($38)</span></td>
+<td>271.82M <span class="cost">($130)</span></td>
 <td>279.16M <span class="cost">($169)</span></td>
 <td>992.1K <span class="cost">($22)</span></td>
 <td>280.15M <span class="cost">($191)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>21.6K <span class="cost">($0)</span></td>
+<td>1.17M <span class="cost">($1)</span></td>
+<td>10.37M <span class="cost">($1)</span></td>
 <td>11.57M <span class="cost">($3)</span></td>
 <td>106.9K <span class="cost">($1)</span></td>
 <td>11.68M <span class="cost">($3)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>24.7K <span class="cost">($0)</span></td>
+<td>5.54M <span class="cost">($35)</span></td>
+<td>255.14M <span class="cost">($128)</span></td>
 <td>260.70M <span class="cost">($162)</span></td>
 <td>791.4K <span class="cost">($20)</span></td>
 <td>261.49M <span class="cost">($182)</span></td>
 </tr>
 <tr class="child">
 <td>└─ sonnet-4-6</td>
+<td>6.9K <span class="cost">($0)</span></td>
+<td>578.5K <span class="cost">($2)</span></td>
+<td>6.31M <span class="cost">($2)</span></td>
 <td>6.89M <span class="cost">($4)</span></td>
 <td>93.8K <span class="cost">($1)</span></td>
 <td>6.98M <span class="cost">($5)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-22</td>
+<td>26.0K <span class="cost">($0)</span></td>
+<td>4.71M <span class="cost">($25)</span></td>
+<td>186.35M <span class="cost">($88)</span></td>
 <td>191.08M <span class="cost">($113)</span></td>
 <td>762.4K <span class="cost">($17)</span></td>
 <td>191.85M <span class="cost">($130)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>15.8K <span class="cost">($0)</span></td>
+<td>824.9K <span class="cost">($1)</span></td>
+<td>11.85M <span class="cost">($1)</span></td>
 <td>12.69M <span class="cost">($2)</span></td>
 <td>70.3K <span class="cost">($0)</span></td>
 <td>12.76M <span class="cost">($3)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>10.0K <span class="cost">($0)</span></td>
+<td>3.61M <span class="cost">($23)</span></td>
+<td>171.59M <span class="cost">($86)</span></td>
 <td>175.20M <span class="cost">($108)</span></td>
 <td>638.7K <span class="cost">($16)</span></td>
 <td>175.84M <span class="cost">($124)</span></td>
 </tr>
 <tr class="child">
 <td>└─ sonnet-4-6</td>
+<td>210 <span class="cost">($0)</span></td>
+<td>278.8K <span class="cost">($1)</span></td>
+<td>2.91M <span class="cost">($1)</span></td>
 <td>3.19M <span class="cost">($2)</span></td>
 <td>53.4K <span class="cost">($1)</span></td>
 <td>3.25M <span class="cost">($3)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-23</td>
+<td>34.4K <span class="cost">($0)</span></td>
+<td>1.52M <span class="cost">($9)</span></td>
+<td>51.80M <span class="cost">($25)</span></td>
 <td>53.35M <span class="cost">($34)</span></td>
 <td>338.0K <span class="cost">($8)</span></td>
 <td>53.69M <span class="cost">($42)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>6.3K <span class="cost">($0)</span></td>
+<td>177.4K <span class="cost">($0)</span></td>
+<td>1.01M <span class="cost">($0)</span></td>
 <td>1.19M <span class="cost">($0)</span></td>
 <td>12.3K <span class="cost">($0)</span></td>
 <td>1.20M <span class="cost">($0)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>28.2K <span class="cost">($0)</span></td>
+<td>1.35M <span class="cost">($8)</span></td>
+<td>50.79M <span class="cost">($25)</span></td>
 <td>52.16M <span class="cost">($34)</span></td>
 <td>325.8K <span class="cost">($8)</span></td>
 <td>52.49M <span class="cost">($42)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-24</td>
+<td>26.7K <span class="cost">($0)</span></td>
+<td>3.49M <span class="cost">($19)</span></td>
+<td>114.14M <span class="cost">($56)</span></td>
 <td>117.65M <span class="cost">($75)</span></td>
 <td>714.3K <span class="cost">($17)</span></td>
 <td>118.36M <span class="cost">($92)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>376 <span class="cost">($0)</span></td>
+<td>478.2K <span class="cost">($1)</span></td>
+<td>3.83M <span class="cost">($0)</span></td>
 <td>4.31M <span class="cost">($1)</span></td>
 <td>35.2K <span class="cost">($0)</span></td>
 <td>4.35M <span class="cost">($1)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>26.3K <span class="cost">($0)</span></td>
+<td>3.01M <span class="cost">($19)</span></td>
+<td>110.30M <span class="cost">($55)</span></td>
 <td>113.33M <span class="cost">($74)</span></td>
 <td>679.0K <span class="cost">($17)</span></td>
 <td>114.01M <span class="cost">($91)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-25</td>
+<td>106.7K <span class="cost">($0)</span></td>
+<td>5.66M <span class="cost">($28)</span></td>
+<td>333.01M <span class="cost">($160)</span></td>
 <td>338.77M <span class="cost">($189)</span></td>
 <td>1.12M <span class="cost">($25)</span></td>
 <td>339.89M <span class="cost">($214)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
+<td>29.4K <span class="cost">($0)</span></td>
+<td>961.3K <span class="cost">($1)</span></td>
+<td>5.29M <span class="cost">($1)</span></td>
 <td>6.28M <span class="cost">($2)</span></td>
 <td>73.0K <span class="cost">($0)</span></td>
 <td>6.35M <span class="cost">($2)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
+<td>65.8K <span class="cost">($0)</span></td>
+<td>3.86M <span class="cost">($24)</span></td>
+<td>307.70M <span class="cost">($154)</span></td>
 <td>311.63M <span class="cost">($178)</span></td>
 <td>854.8K <span class="cost">($21)</span></td>
 <td>312.48M <span class="cost">($200)</span></td>
 </tr>
 <tr class="child">
 <td>└─ sonnet-4-6</td>
+<td>11.5K <span class="cost">($0)</span></td>
+<td>834.1K <span class="cost">($3)</span></td>
+<td>20.02M <span class="cost">($6)</span></td>
 <td>20.86M <span class="cost">($9)</span></td>
 <td>194.7K <span class="cost">($3)</span></td>
 <td>21.06M <span class="cost">($12)</span></td>
 </tr>
 <tr class="parent">
 <td>2026-03-26</td>
-<td>16.25M <span class="cost">($10)</span></td>
-<td>157.5K <span class="cost">($4)</span></td>
-<td>16.41M <span class="cost">($14)</span></td>
+<td>10.4K <span class="cost">($0)</span></td>
+<td>1.58M <span class="cost">($8)</span></td>
+<td>46.43M <span class="cost">($22)</span></td>
+<td>48.02M <span class="cost">($30)</span></td>
+<td>387.0K <span class="cost">($9)</span></td>
+<td>48.41M <span class="cost">($38)</span></td>
 </tr>
 <tr class="child">
 <td>└─ haiku-4-5</td>
-<td>965.2K <span class="cost">($0)</span></td>
-<td>9.5K <span class="cost">($0)</span></td>
-<td>974.6K <span class="cost">($0)</span></td>
+<td>7.1K <span class="cost">($0)</span></td>
+<td>274.9K <span class="cost">($0)</span></td>
+<td>1.32M <span class="cost">($0)</span></td>
+<td>1.60M <span class="cost">($0)</span></td>
+<td>18.8K <span class="cost">($0)</span></td>
+<td>1.62M <span class="cost">($1)</span></td>
 </tr>
 <tr class="child">
 <td>└─ opus-4-6</td>
-<td>15.29M <span class="cost">($10)</span></td>
-<td>148.0K <span class="cost">($4)</span></td>
-<td>15.43M <span class="cost">($14)</span></td>
+<td>2.7K <span class="cost">($0)</span></td>
+<td>1.04M <span class="cost">($7)</span></td>
+<td>41.61M <span class="cost">($21)</span></td>
+<td>42.65M <span class="cost">($27)</span></td>
+<td>292.5K <span class="cost">($7)</span></td>
+<td>42.95M <span class="cost">($35)</span></td>
+</tr>
+<tr class="child">
+<td>└─ sonnet-4-6</td>
+<td>521 <span class="cost">($0)</span></td>
+<td>264.3K <span class="cost">($1)</span></td>
+<td>3.51M <span class="cost">($1)</span></td>
+<td>3.77M <span class="cost">($2)</span></td>
+<td>75.7K <span class="cost">($1)</span></td>
+<td>3.85M <span class="cost">($3)</span></td>
 </tr>
 </tbody>
 <tfoot>
 <tr class="totals totals-main">
 <td>TOTAL</td>
-<td>1835.59M <span class="cost">($1081)</span></td>
-<td>8.75M <span class="cost">($199)</span></td>
-<td>1844.34M <span class="cost">($1280)</span></td>
+<td>428.4K <span class="cost">($2)</span></td>
+<td>43.06M <span class="cost">($224)</span></td>
+<td>1823.87M <span class="cost">($875)</span></td>
+<td>1867.37M <span class="cost">($1100)</span></td>
+<td>8.97M <span class="cost">($204)</span></td>
+<td>1876.34M <span class="cost">($1304)</span></td>
 </tr>
 <tr class="totals totals-child">
 <td>└─ haiku-4-5</td>
-<td>84.63M <span class="cost">($18)</span></td>
-<td>777.2K <span class="cost">($4)</span></td>
-<td>85.41M <span class="cost">($21)</span></td>
+<td>105.1K <span class="cost">($0)</span></td>
+<td>7.98M <span class="cost">($10)</span></td>
+<td>77.18M <span class="cost">($8)</span></td>
+<td>85.26M <span class="cost">($18)</span></td>
+<td>786.6K <span class="cost">($4)</span></td>
+<td>86.05M <span class="cost">($22)</span></td>
 </tr>
 <tr class="totals totals-child">
 <td>└─ opus-4-6</td>
-<td>1719.97M <span class="cost">($1048)</span></td>
-<td>7.57M <span class="cost">($189)</span></td>
-<td>1727.54M <span class="cost">($1237)</span></td>
+<td>304.2K <span class="cost">($2)</span></td>
+<td>33.08M <span class="cost">($207)</span></td>
+<td>1713.95M <span class="cost">($857)</span></td>
+<td>1747.34M <span class="cost">($1065)</span></td>
+<td>7.72M <span class="cost">($193)</span></td>
+<td>1755.05M <span class="cost">($1258)</span></td>
 </tr>
 <tr class="totals totals-child">
 <td>└─ sonnet-4-6</td>
-<td>31.00M <span class="cost">($15)</span></td>
-<td>393.6K <span class="cost">($6)</span></td>
-<td>31.39M <span class="cost">($21)</span></td>
+<td>19.2K <span class="cost">($0)</span></td>
+<td>2.01M <span class="cost">($8)</span></td>
+<td>32.74M <span class="cost">($10)</span></td>
+<td>34.77M <span class="cost">($17)</span></td>
+<td>469.3K <span class="cost">($7)</span></td>
+<td>35.24M <span class="cost">($24)</span></td>
 </tr>
 </tfoot>
 </table>

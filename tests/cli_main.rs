@@ -74,24 +74,24 @@ fn two_record_fixture() -> TempDir {
 
 #[test]
 fn test_help_flag() {
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .arg("--help")
         .assert()
         .success()
-        .stderr(predicate::str::contains("Usage: cctokens"));
+        .stderr(predicate::str::contains("Usage: ccost"));
 }
 
 // ─── 2. --version flag ───────────────────────────────────────────────────────
 
 #[test]
 fn test_version_flag() {
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("cctokens v1.0.0"));
+        .stdout(predicate::str::contains("ccost v1.0.0"));
 }
 
 // ─── 3. Terminal table output with --tz UTC ──────────────────────────────────
@@ -99,7 +99,7 @@ fn test_version_flag() {
 #[test]
 fn test_terminal_table_output() {
     let dir = two_record_fixture();
-    let assert = Command::cargo_bin("cctokens")
+    let assert = Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--claude-dir",
@@ -139,7 +139,7 @@ fn test_terminal_table_output() {
 #[test]
 fn test_order_desc() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens")
+    let output = Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--claude-dir",
@@ -171,7 +171,7 @@ fn test_order_desc() {
 #[test]
 fn test_cost_decimal_mode() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens")
+    let output = Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--cost",
@@ -192,7 +192,7 @@ fn test_cost_decimal_mode() {
 #[test]
 fn test_cost_false_mode() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens")
+    let output = Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--cost",
@@ -212,7 +212,7 @@ fn test_cost_false_mode() {
 #[test]
 fn test_cost_true_mode() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens")
+    let output = Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--cost",
@@ -266,7 +266,7 @@ fn test_date_filtering() {
         ),
     ]);
 
-    let output = Command::cargo_bin("cctokens")
+    let output = Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--from",
@@ -304,7 +304,7 @@ fn test_date_filtering() {
 #[test]
 fn test_5hfrom_flag() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--5hfrom",
@@ -325,7 +325,7 @@ fn test_output_json() {
     let dir = two_record_fixture();
     let out_dir = TempDir::new().unwrap();
 
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--output",
@@ -339,8 +339,8 @@ fn test_output_json() {
         .assert()
         .success();
 
-    let json_path = out_dir.path().join("cctokens.json");
-    assert!(json_path.exists(), "cctokens.json should exist");
+    let json_path = out_dir.path().join("ccost.json");
+    assert!(json_path.exists(), "ccost.json should exist");
 
     let content = fs::read_to_string(&json_path).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
@@ -363,7 +363,7 @@ fn test_output_markdown() {
     let dir = two_record_fixture();
     let out_dir = TempDir::new().unwrap();
 
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--output",
@@ -377,8 +377,8 @@ fn test_output_markdown() {
         .assert()
         .success();
 
-    let md_path = out_dir.path().join("cctokens.md");
-    assert!(md_path.exists(), "cctokens.md should exist");
+    let md_path = out_dir.path().join("ccost.md");
+    assert!(md_path.exists(), "ccost.md should exist");
 
     let content = fs::read_to_string(&md_path).unwrap();
     assert!(content.contains("|"), "Markdown should contain '|'");
@@ -393,7 +393,7 @@ fn test_output_html() {
     let dir = two_record_fixture();
     let out_dir = TempDir::new().unwrap();
 
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--output",
@@ -407,8 +407,8 @@ fn test_output_html() {
         .assert()
         .success();
 
-    let html_path = out_dir.path().join("cctokens.html");
-    assert!(html_path.exists(), "cctokens.html should exist");
+    let html_path = out_dir.path().join("ccost.html");
+    assert!(html_path.exists(), "ccost.html should exist");
 
     let content = fs::read_to_string(&html_path).unwrap();
     assert!(
@@ -425,7 +425,7 @@ fn test_output_csv() {
     let dir = two_record_fixture();
     let out_dir = TempDir::new().unwrap();
 
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--output",
@@ -439,8 +439,8 @@ fn test_output_csv() {
         .assert()
         .success();
 
-    let csv_path = out_dir.path().join("cctokens.csv");
-    assert!(csv_path.exists(), "cctokens.csv should exist");
+    let csv_path = out_dir.path().join("ccost.csv");
+    assert!(csv_path.exists(), "ccost.csv should exist");
 
     let content = fs::read_to_string(&csv_path).unwrap();
     let first_line = content.lines().next().unwrap();
@@ -457,7 +457,7 @@ fn test_output_tsv() {
     let dir = two_record_fixture();
     let out_dir = TempDir::new().unwrap();
 
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--output",
@@ -471,8 +471,8 @@ fn test_output_tsv() {
         .assert()
         .success();
 
-    let tsv_path = out_dir.path().join("cctokens.tsv");
-    assert!(tsv_path.exists(), "cctokens.tsv should exist");
+    let tsv_path = out_dir.path().join("ccost.tsv");
+    assert!(tsv_path.exists(), "ccost.tsv should exist");
 
     let content = fs::read_to_string(&tsv_path).unwrap();
     let first_line = content.lines().next().unwrap();
@@ -489,7 +489,7 @@ fn test_output_txt() {
     let dir = two_record_fixture();
     let out_dir = TempDir::new().unwrap();
 
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--output",
@@ -503,8 +503,8 @@ fn test_output_txt() {
         .assert()
         .success();
 
-    let txt_path = out_dir.path().join("cctokens.txt");
-    assert!(txt_path.exists(), "cctokens.txt should exist");
+    let txt_path = out_dir.path().join("ccost.txt");
+    assert!(txt_path.exists(), "ccost.txt should exist");
 
     let content = fs::read_to_string(&txt_path).unwrap();
     // Should contain box-drawing characters
@@ -524,7 +524,7 @@ fn test_output_txt() {
 #[test]
 fn test_table_compact() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens")
+    let output = Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--table",
@@ -547,7 +547,7 @@ fn test_table_compact() {
 #[test]
 fn test_table_full() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens")
+    let output = Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--table",
@@ -571,7 +571,7 @@ fn test_table_full() {
 
 #[test]
 fn test_unknown_flag_error() {
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .arg("--nonexistent")
         .assert()
@@ -581,7 +581,7 @@ fn test_unknown_flag_error() {
 #[test]
 fn test_chart_output_conflict_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--chart",
@@ -606,7 +606,7 @@ fn test_filename_without_output() {
     let out_dir = TempDir::new().unwrap();
     let custom_path = out_dir.path().join("custom.txt");
 
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--filename",
@@ -655,7 +655,7 @@ fn test_custom_pricing_data() {
     });
     fs::write(&pricing_path, serde_json::to_string_pretty(&pricing_json).unwrap()).unwrap();
 
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--pricing-data",
@@ -674,7 +674,7 @@ fn test_custom_pricing_data() {
 #[test]
 fn test_chart_cost_mode() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens")
+    let output = Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--chart",
@@ -704,7 +704,7 @@ fn test_chart_cost_mode() {
 #[test]
 fn test_chart_token_mode() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens")
+    let output = Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--chart",
@@ -733,7 +733,7 @@ fn test_chart_token_mode() {
 #[test]
 fn test_1wfrom_flag() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--1wfrom",
@@ -750,7 +750,7 @@ fn test_1wfrom_flag() {
 #[test]
 fn test_1wto_flag() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens")
+    Command::cargo_bin("ccost")
         .unwrap()
         .args([
             "--1wto",
@@ -776,7 +776,7 @@ fn test_5hto_flag() {
         mock_rec("claude-sonnet-4-20250514", 2000, 800, 0, 0,
             "2026-03-23T14:00:00Z", "req-2", "msg-2"),
     ]);
-    let output = Command::cargo_bin("cctokens").unwrap()
+    let output = Command::cargo_bin("ccost").unwrap()
         .args(["--5hto", "2026-03-23T15:00:00", "--tz", "UTC",
                "--claude-dir", dir.path().to_str().unwrap(),
                "--per", "day", "--output", "json"])
@@ -786,7 +786,7 @@ fn test_5hto_flag() {
     let stdout = String::from_utf8(output.stderr).unwrap();
     assert!(output.status.success());
     // The JSON file should have been created; check it has data
-    let json_path = dir.path().join("cctokens.json");
+    let json_path = dir.path().join("ccost.json");
     if json_path.exists() {
         let content = fs::read_to_string(&json_path).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
@@ -800,7 +800,7 @@ fn test_5hto_flag() {
 #[test]
 fn test_invalid_date_format_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--from", "not-a-date", "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
         .failure()
@@ -810,7 +810,7 @@ fn test_invalid_date_format_error() {
 #[test]
 fn test_invalid_per_dimension_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--per", "banana", "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
         .failure()
@@ -820,7 +820,7 @@ fn test_invalid_per_dimension_error() {
 #[test]
 fn test_invalid_cost_mode_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--cost", "banana", "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
         .failure()
@@ -830,7 +830,7 @@ fn test_invalid_cost_mode_error() {
 #[test]
 fn test_invalid_output_format_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--output", "banana", "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
         .failure()
@@ -840,7 +840,7 @@ fn test_invalid_output_format_error() {
 #[test]
 fn test_invalid_table_mode_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--table", "banana", "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
         .failure()
@@ -850,7 +850,7 @@ fn test_invalid_table_mode_error() {
 #[test]
 fn test_invalid_chart_mode_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--chart", "banana", "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
         .failure()
@@ -862,7 +862,7 @@ fn test_invalid_chart_mode_error() {
 #[test]
 fn test_5h_conflict_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--5hfrom", "2026-03-23T10:00:00", "--5hto", "2026-03-23T15:00:00",
                "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
@@ -873,7 +873,7 @@ fn test_5h_conflict_error() {
 #[test]
 fn test_1w_conflict_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--1wfrom", "2026-03-18T00:00:00", "--1wto", "2026-03-25T00:00:00",
                "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
@@ -884,7 +884,7 @@ fn test_1w_conflict_error() {
 #[test]
 fn test_5h_1w_conflict_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--5hfrom", "2026-03-23T10:00:00", "--1wfrom", "2026-03-18T00:00:00",
                "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
@@ -895,7 +895,7 @@ fn test_5h_1w_conflict_error() {
 #[test]
 fn test_from_with_5h_conflict_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--from", "2026-03-20", "--5hfrom", "2026-03-23T10:00:00",
                "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
@@ -906,7 +906,7 @@ fn test_from_with_5h_conflict_error() {
 #[test]
 fn test_live_pricing_and_pricing_data_conflict() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--live-pricing", "--pricing-data", "/some/file.json",
                "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
@@ -917,7 +917,7 @@ fn test_live_pricing_and_pricing_data_conflict() {
 #[test]
 fn test_per_max_two_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--per", "day", "--per", "model", "--per", "session",
                "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
@@ -930,7 +930,7 @@ fn test_per_max_two_error() {
 #[test]
 fn test_invalid_order_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--order", "banana", "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
         .failure()
@@ -945,7 +945,7 @@ fn test_empty_claude_dir() {
     let proj_dir = dir.path().join("projects");
     fs::create_dir_all(&proj_dir).unwrap();
 
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--claude-dir", dir.path().to_str().unwrap(), "--tz", "UTC"])
         .assert()
         .success();
@@ -959,7 +959,7 @@ fn test_filename_with_output_json() {
     let out_dir = TempDir::new().unwrap();
     let custom_path = out_dir.path().join("report.json");
 
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--output", "json", "--filename", custom_path.to_str().unwrap(),
                "--claude-dir", dir.path().to_str().unwrap(), "--tz", "UTC"])
         .assert()
@@ -976,7 +976,7 @@ fn test_filename_with_output_json() {
 #[test]
 fn test_per_model_only() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens").unwrap()
+    let output = Command::cargo_bin("ccost").unwrap()
         .args(["--per", "model", "--claude-dir", dir.path().to_str().unwrap(),
                "--tz", "UTC"])
         .output().unwrap();
@@ -994,7 +994,7 @@ fn test_chart_with_output_txt_allowed() {
     let dir = two_record_fixture();
     let out_dir = TempDir::new().unwrap();
 
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--chart", "cost", "--output", "txt",
                "--claude-dir", dir.path().to_str().unwrap(),
                "--tz", "UTC"])
@@ -1002,7 +1002,7 @@ fn test_chart_with_output_txt_allowed() {
         .assert()
         .success();
 
-    let txt_path = out_dir.path().join("cctokens.txt");
+    let txt_path = out_dir.path().join("ccost.txt");
     assert!(txt_path.exists(), "chart + txt output should create file");
 }
 
@@ -1012,7 +1012,7 @@ fn test_chart_with_output_txt_allowed() {
 fn test_table_auto_wide_terminal() {
     // COLUMNS=200 → wide terminal → should show full table (Cache Cr visible)
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens").unwrap()
+    let output = Command::cargo_bin("ccost").unwrap()
         .env("COLUMNS", "200")
         .args(["--table", "auto",
                "--claude-dir", dir.path().to_str().unwrap(),
@@ -1030,7 +1030,7 @@ fn test_table_auto_wide_terminal() {
 fn test_table_auto_narrow_terminal() {
     // COLUMNS=80 → narrow terminal → should show compact table (no Cache Cr)
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens").unwrap()
+    let output = Command::cargo_bin("ccost").unwrap()
         .env("COLUMNS", "80")
         .args(["--table", "auto",
                "--claude-dir", dir.path().to_str().unwrap(),
@@ -1044,12 +1044,62 @@ fn test_table_auto_narrow_terminal() {
     );
 }
 
+#[test]
+fn test_table_auto_with_output_uses_full() {
+    // --table auto (default) + --output should produce full table (not compact)
+    let dir = two_record_fixture();
+    let out_dir = TempDir::new().unwrap();
+    let out_file = out_dir.path().join("out.txt");
+
+    Command::cargo_bin("ccost").unwrap()
+        .env("COLUMNS", "80") // narrow terminal, but shouldn't matter with --output
+        .args([
+            "--output", "txt",
+            "--filename", out_file.to_str().unwrap(),
+            "--claude-dir", dir.path().to_str().unwrap(),
+            "--tz", "UTC",
+        ])
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(&out_file).unwrap();
+    assert!(
+        content.contains("Cache Cr"),
+        "--table auto with --output should use full table (show Cache Cr), even with narrow COLUMNS"
+    );
+}
+
+#[test]
+fn test_table_compact_with_output_stays_compact() {
+    // --table compact + --output should still produce compact table
+    let dir = two_record_fixture();
+    let out_dir = TempDir::new().unwrap();
+    let out_file = out_dir.path().join("out.txt");
+
+    Command::cargo_bin("ccost").unwrap()
+        .args([
+            "--output", "txt",
+            "--table", "compact",
+            "--filename", out_file.to_str().unwrap(),
+            "--claude-dir", dir.path().to_str().unwrap(),
+            "--tz", "UTC",
+        ])
+        .assert()
+        .success();
+
+    let content = fs::read_to_string(&out_file).unwrap();
+    assert!(
+        !content.contains("Cache Cr"),
+        "--table compact with --output should stay compact (no Cache Cr)"
+    );
+}
+
 // ─── 30. --copy flag ───────────────────────────────────────────────────
 
 #[test]
 fn test_copy_invalid_format_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("cctokens").unwrap()
+    Command::cargo_bin("ccost").unwrap()
         .args(["--copy", "banana",
                "--claude-dir", dir.path().to_str().unwrap()])
         .assert()
@@ -1063,7 +1113,7 @@ fn test_copy_with_output_both_work() {
     let dir = two_record_fixture();
     let out_dir = TempDir::new().unwrap();
 
-    let output = Command::cargo_bin("cctokens").unwrap()
+    let output = Command::cargo_bin("ccost").unwrap()
         .args(["--output", "json", "--copy", "markdown",
                "--claude-dir", dir.path().to_str().unwrap(),
                "--tz", "UTC"])
@@ -1071,7 +1121,7 @@ fn test_copy_with_output_both_work() {
         .output().unwrap();
 
     // The JSON file should still be written
-    let json_path = out_dir.path().join("cctokens.json");
+    let json_path = out_dir.path().join("ccost.json");
     assert!(json_path.exists(), "JSON file should still be created with --copy");
 
     let stderr = String::from_utf8(output.stderr).unwrap();
@@ -1088,7 +1138,7 @@ fn test_copy_with_output_both_work() {
 fn test_copy_with_terminal_output() {
     // --copy alone should still print table to stdout
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens").unwrap()
+    let output = Command::cargo_bin("ccost").unwrap()
         .args(["--copy", "json",
                "--claude-dir", dir.path().to_str().unwrap(),
                "--tz", "UTC"])
@@ -1110,7 +1160,7 @@ fn test_copy_with_terminal_output() {
 #[test]
 fn test_copy_with_chart() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("cctokens").unwrap()
+    let output = Command::cargo_bin("ccost").unwrap()
         .args(["--chart", "cost", "--copy", "csv",
                "--claude-dir", dir.path().to_str().unwrap(),
                "--tz", "UTC"])

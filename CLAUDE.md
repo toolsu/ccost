@@ -4,11 +4,20 @@
 
 CLI and library: reads Claude Code JSONL from `~/.claude/projects/` and `~/.config/claude/projects/`, deduplicates, calculates costs (LiteLLM pricing), groups by configurable dimensions, outputs table/JSON/markdown/HTML/chart.
 
-Rust port of [cctokens](https://github.com/tomchen/cctokens) (TypeScript).
+Also includes `ccost sl` subcommand: reads `~/.claude/statusline.jsonl` for rate limit tracking, session summaries, 5h budget estimation, and cost cross-comparison.
 
-Pipeline: `load_records → calculate_cost → group_records → format`
+Rust port of [ccost](https://github.com/toolsu/ccost) (TypeScript).
+
+## Architecture
+
+Main pipeline: `load_records → calculate_cost → group_records → format`
+
+sl pipeline: `load_sl_records → filter → aggregate (segment-aware) → format`
 
 `src/` is split into pure library (`lib.rs`, `types.rs`, `parser.rs`, `pricing.rs`, `grouper.rs`, `formatters/`) and CLI (`main.rs`).
+
+- `src/sl/` — statusline analysis module: `types.rs`, `parser.rs`, `aggregator.rs`, `formatter.rs`
+- `src/utils.rs` — shared utilities (clipboard, date parsing, terminal width)
 
 ## Key design decisions
 
@@ -20,10 +29,24 @@ Pipeline: `load_records → calculate_cost → group_records → format`
 
 **Timezone handling:** Uses `chrono` + `chrono-tz` for IANA timezone support, `chrono::FixedOffset` for +HH:MM offsets, `chrono::Local` for system timezone.
 
+**sl segment-aware aggregation:** statusline.jsonl has cumulative counters (cost, duration, tokens, lines) that reset to 0 on session resume. Detect resets by comparing consecutive records; sum max-per-segment across segments.
+
+**sl unified table columns:** All `--per` views (session/project/day/5h/1w) share the same column set: `[Label] | Cost | Duration | API Time | Lines +/- | Sessions | 5h% | 1w%`. `--per 5h` / `--per 1w` add Est Budget (= cost × 100 / Δ5h%). `5h%` and `1w%` show min–max ranges. `--per` only changes the first column. Compact mode: `[Label] | Cost | Duration | Sessions | 5h%`.
+
+**`--table auto` behavior:** When writing to file (`--output`/`--filename`), auto selects full table. When printing to terminal, auto selects compact if width < 120.
+
 ## Commands
 
 ```bash
-cargo test                  # all tests (169 total)
+cargo test                  # all tests
 cargo build --release       # optimized build
 cargo run -- --help         # show CLI help
+cargo run -- sl --help      # show sl subcommand help
 ```
+
+## Maintenance rules
+
+**Every code change must also update, if applicable:**
+- **Tests** — add or update tests to cover the change
+- **README.md** — update documentation, CLI reference, examples
+- **CLAUDE.md** — update this file if architecture, design decisions, or conventions change

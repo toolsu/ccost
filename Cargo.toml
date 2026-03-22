@@ -1,14 +1,14 @@
 [package]
-name = "cctokens"
+name = "ccost"
 version = "1.0.0"
 edition = "2021"
 
 [[bin]]
-name = "cctokens"
+name = "ccost"
 path = "src/main.rs"
 
 [lib]
-name = "cctokens"
+name = "ccost"
 path = "src/lib.rs"
 
 [dependencies]

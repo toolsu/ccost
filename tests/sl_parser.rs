@@ -1,4 +1,4 @@
-use cctokens::sl::{SlLoadOptions, load_sl_records};
+use ccost::sl::{SlLoadOptions, load_sl_records};
 use std::io::Write;
 use tempfile::NamedTempFile;
 
