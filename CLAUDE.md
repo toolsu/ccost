@@ -31,7 +31,9 @@ sl pipeline: `load_sl_records → filter → aggregate (segment-aware) → forma
 
 **sl segment-aware aggregation:** statusline.jsonl has cumulative counters (cost, duration, tokens, lines) that reset to 0 on session resume. Detect resets by comparing consecutive records; sum max-per-segment across segments.
 
-**sl unified table columns:** All `--per` views (session/project/day/5h/1w) share the same column set: `[Label] | Cost | Duration | API Time | Lines +/- | Sessions | 5h% | 1w%`. `--per 5h` / `--per 1w` add Est Budget (= cost × 100 / Δ5h%). `5h%` and `1w%` show min–max ranges. `--per` only changes the first column. Compact mode: `[Label] | Cost | Duration | Sessions | 5h%`.
+**sl unified table columns:** All `--per` views (session/project/day/1h/5h/1w) share the same column set: `[Label] | Cost | Duration | API Time | Lines +/- | Sess | 5h% | 1w%`. `--per 1h`/`--per 5h` add `Est 5h Budg` (= cost × 100 / Δ5h%); `--per 1w` adds `Est 1w Budg`. `--per 1h` also adds `5h Resets`. `--per action` includes `Cost` (delta). `5h%` and `1w%` show min–max ranges. Compact mode: `[Label] | Cost | Duration | Sess | 5h%`.
+
+**sl promo adjustment (default on):** Adjusts Est Budget for known 2x usage promo periods (2025-12, 2026-03). Hardcoded UTC intervals in `aggregator.rs`. Adjustment: `adjusted_delta = delta_pct × (1 + promo_overlap_ratio)`. Disable with `--nopromo`.
 
 **`--table auto` behavior:** When writing to file (`--output`/`--filename`), auto selects full table. When printing to terminal, auto selects compact if width < 120.
 

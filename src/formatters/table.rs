@@ -211,7 +211,7 @@ pub fn format_table(data: &[GroupedData], totals: &GroupedData, options: &TableO
     for (row_idx, row) in totals_rows.iter().enumerate() {
         output.push('\u{2502}');
 
-        let green_start = if color_enabled { "\x1b[92m" } else { "" };
+        let green_start = if color_enabled { "\x1b[33m" } else { "" };
         let green_end = if color_enabled { "\x1b[0m" } else { "" };
 
         // Label column (left-aligned)

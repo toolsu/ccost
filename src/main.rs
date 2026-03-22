@@ -143,6 +143,11 @@ fn build_sl_subcommand() -> Command {
         .arg(Arg::new("1wfrom").long("1wfrom").value_name("datetime"))
         .arg(Arg::new("1wto").long("1wto").value_name("datetime"))
         .arg(
+            Arg::new("nopromo")
+                .long("nopromo")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
             Arg::new("claude-dir")
                 .long("claude-dir")
                 .value_name("dir"),
@@ -672,8 +677,9 @@ Analyze Claude statusline data (rate limits, sessions, costs).
 
 Options:
   --file <path>         Path to statusline.jsonl (default: ~/.claude/statusline.jsonl)
-  --per <dim>           Group by: action, session, project, day, 5h (default), 1w
+  --per <dim>           Group by: action, session, project, day, 1h, 5h (default), 1w
                         Default (no --per): rate-limit timeline
+  --nopromo             Disable promo adjustment for Est Budget (default: adjusts for 2x promo periods)
   --chart <mode>        Chart mode: 5h, 1w, cost
   --cost-diff           Compare SL costs with LiteLLM pricing (requires --per session)
   --from <date>         Start date (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
@@ -683,9 +689,9 @@ Options:
   --project <name>      Filter by project (substring, case-insensitive)
   --model <name>        Filter by model (substring, case-insensitive)
   --cost <mode>         Cost display: true (default, integer), false (off), decimal (2 d.p.)
-  --output <format>     Output format: json, csv, txt
+  --output <format>     Output format: json, markdown, html, txt, csv, tsv
   --filename <path>     Write output to file
-  --copy <format>       Copy to clipboard: json, csv, txt
+  --copy <format>       Copy to clipboard: json, markdown, html, txt, csv, tsv
   --order <order>       Sort order: asc (default), desc
   --table <mode>        Table mode: auto (default), full, compact
   --5hfrom <datetime>   5-hour window from datetime
@@ -717,11 +723,12 @@ fn run_sl(matches: &clap::ArgMatches) {
             "session" => SlViewMode::Session,
             "project" => SlViewMode::Project,
             "day" => SlViewMode::Day,
+            "1h" => SlViewMode::Window1h,
             "5h" => SlViewMode::Window5h,
             "1w" => SlViewMode::Window1w,
             _ => {
                 errors.push(format!(
-                    "--per: invalid dimension '{}'. Valid: action, session, project, day, 5h, 1w",
+                    "--per: invalid dimension '{}'. Valid: action, session, project, day, 1h, 5h, 1w",
                     p
                 ));
                 SlViewMode::Window5h
@@ -769,13 +776,13 @@ fn run_sl(matches: &clap::ArgMatches) {
         PriceMode::Integer
     };
 
-    // --output: validate (sl supports json, csv, txt)
+    // --output: validate
     let output_format = matches.get_one::<String>("output").cloned();
     if let Some(ref fmt) = output_format {
         match fmt.as_str() {
-            "json" | "csv" | "txt" => {}
+            "json" | "csv" | "tsv" | "txt" | "markdown" | "html" => {}
             _ => errors.push(format!(
-                "--output: invalid format '{}'. Valid: json, csv, txt",
+                "--output: invalid format '{}'. Valid: json, markdown, html, txt, csv, tsv",
                 fmt
             )),
         }
@@ -785,9 +792,9 @@ fn run_sl(matches: &clap::ArgMatches) {
     let copy_format = matches.get_one::<String>("copy").cloned();
     if let Some(ref fmt) = copy_format {
         match fmt.as_str() {
-            "json" | "csv" | "txt" => {}
+            "json" | "csv" | "tsv" | "txt" | "markdown" | "html" => {}
             _ => errors.push(format!(
-                "--copy: invalid format '{}'. Valid: json, csv, txt",
+                "--copy: invalid format '{}'. Valid: json, markdown, html, txt, csv, tsv",
                 fmt
             )),
         }
@@ -871,6 +878,9 @@ fn run_sl(matches: &clap::ArgMatches) {
     if cost_diff && view_mode != SlViewMode::Session {
         eprintln!("Warning: --cost-diff is only effective with --per session");
     }
+
+    // --nopromo (default: promo adjustment enabled)
+    let promo = !matches.get_flag("nopromo");
 
     // Exit if any errors
     if !errors.is_empty() {
@@ -959,6 +969,7 @@ fn run_sl(matches: &clap::ArgMatches) {
             SlViewMode::Session => "session".to_string(),
             SlViewMode::Project => "project".to_string(),
             SlViewMode::Day => "day".to_string(),
+            SlViewMode::Window1h => "1h".to_string(),
             SlViewMode::Window5h => "5h".to_string(),
             SlViewMode::Window1w => "1w".to_string(),
         },
@@ -1075,14 +1086,19 @@ fn run_sl(matches: &clap::ArgMatches) {
                     let days = aggregate_by_day(&sessions, tz_opt.as_deref());
                     format_sl_json_days(&days, &json_meta)
                 }
+                SlViewMode::Window1h => {
+                    let sessions = aggregate_sessions(recs);
+                    let windows = aggregate_windows(recs, &sessions, WindowType::OneHour, promo);
+                    format_sl_json_windows(&windows, &json_meta)
+                }
                 SlViewMode::Window5h => {
                     let sessions = aggregate_sessions(recs);
-                    let windows = aggregate_windows(recs, &sessions, WindowType::FiveHour);
+                    let windows = aggregate_windows(recs, &sessions, WindowType::FiveHour, promo);
                     format_sl_json_windows(&windows, &json_meta)
                 }
                 SlViewMode::Window1w => {
                     let sessions = aggregate_sessions(recs);
-                    let windows = aggregate_windows(recs, &sessions, WindowType::OneWeek);
+                    let windows = aggregate_windows(recs, &sessions, WindowType::OneWeek, promo);
                     format_sl_json_windows(&windows, &json_meta)
                 }
             },
@@ -1096,11 +1112,21 @@ fn run_sl(matches: &clap::ArgMatches) {
                     format_sl_csv_sessions(&sessions, &opts)
                 }
                 _ => {
-                    // For views without dedicated CSV formatters, fall back to txt
-                    generate_sl_table_content(view, recs, &opts, cost_diff, matches)
+                    generate_sl_table_content(view, recs, &opts, cost_diff, promo, matches)
                 }
             },
-            "txt" | _ => generate_sl_table_content(view, recs, &opts, cost_diff, matches),
+            "markdown" | "html" | "tsv" => {
+                let (headers, rows, totals) =
+                    generate_sl_table_data(view, recs, &opts, cost_diff, promo, matches);
+                let totals_ref = totals.as_ref();
+                match fmt {
+                    "markdown" => render_markdown(&headers, &rows, totals_ref),
+                    "html" => render_html(&headers, &rows, totals_ref),
+                    "tsv" => render_tsv(&headers, &rows, totals_ref),
+                    _ => unreachable!(),
+                }
+            },
+            "txt" | _ => generate_sl_table_content(view, recs, &opts, cost_diff, promo, matches),
         }
     };
 
@@ -1117,7 +1143,7 @@ fn run_sl(matches: &clap::ArgMatches) {
     if output_format.is_none() && filename_opt.is_none() {
         // Print colored table to stdout
         let table_str =
-            generate_sl_table_content(&view_mode, &records, &fmt_opts, cost_diff, matches);
+            generate_sl_table_content(&view_mode, &records, &fmt_opts, cost_diff, promo, matches);
         print!("{}", table_str);
         return;
     }
@@ -1128,7 +1154,7 @@ fn run_sl(matches: &clap::ArgMatches) {
         Some(fmt) => generate_sl_content(fmt, &view_mode, &records, false),
         None => {
             // --filename without --output: write plain text table (no ANSI)
-            generate_sl_table_content(&view_mode, &records, &fmt_opts_nocolor, cost_diff, matches)
+            generate_sl_table_content(&view_mode, &records, &fmt_opts_nocolor, cost_diff, promo, matches)
         }
     };
 
@@ -1147,6 +1173,7 @@ fn generate_sl_table_content(
     records: &[ccost::sl::SlRecord],
     opts: &SlFormatOptions,
     cost_diff: bool,
+    promo: bool,
     matches: &clap::ArgMatches,
 ) -> String {
     match view_mode {
@@ -1173,17 +1200,99 @@ fn generate_sl_table_content(
             let days = aggregate_by_day(&sessions, opts.tz.as_deref());
             format_sl_day_table(&days, opts)
         }
+        SlViewMode::Window1h => {
+            let sessions = aggregate_sessions(records);
+            let windows = aggregate_windows(records, &sessions, WindowType::OneHour, promo);
+            format_sl_window_table(&windows, opts, "1h Window", "Est 5h Budg")
+        }
         SlViewMode::Window5h => {
             let sessions = aggregate_sessions(records);
-            let windows = aggregate_windows(records, &sessions, WindowType::FiveHour);
-            format_sl_window_table(&windows, opts, "5h Window")
+            let windows = aggregate_windows(records, &sessions, WindowType::FiveHour, promo);
+            format_sl_window_table(&windows, opts, "5h Window", "Est 5h Budg")
         }
         SlViewMode::Window1w => {
             let sessions = aggregate_sessions(records);
-            let windows = aggregate_windows(records, &sessions, WindowType::OneWeek);
-            format_sl_window_table(&windows, opts, "1w Window")
+            let windows = aggregate_windows(records, &sessions, WindowType::OneWeek, promo);
+            format_sl_window_table(&windows, opts, "1w Window", "Est 1w Budg")
         }
     }
+}
+
+/// Generate structured table data (headers, rows, totals) for any sl view.
+/// Used for markdown, html, tsv output where we need raw data, not rendered box-drawing.
+fn generate_sl_table_data(
+    view_mode: &SlViewMode,
+    records: &[ccost::sl::SlRecord],
+    opts: &SlFormatOptions,
+    _cost_diff: bool,
+    promo: bool,
+    _matches: &clap::ArgMatches,
+) -> (Vec<String>, Vec<Vec<String>>, Option<Vec<String>>) {
+    // Generate the txt table (no color) and parse it back into structured data
+    // This is the simplest approach that reuses all existing table logic.
+    //
+    // The txt table format uses box-drawing characters:
+    // ┌─┬─┐  (top)
+    // │ │ │  (header row)
+    // ├─┼─┤  (separator)
+    // │ │ │  (data rows, separated by ├─┼─┤)
+    // └─┴─┘  (bottom)
+    let no_color_opts = SlFormatOptions {
+        tz: opts.tz.clone(),
+        price_mode: opts.price_mode,
+        compact: opts.compact,
+        color: false,
+    };
+    let table_str = generate_sl_table_content(view_mode, records, &no_color_opts, false, promo, _matches);
+
+    // Parse box-drawing table into headers, rows, totals
+    let mut headers: Vec<String> = Vec::new();
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut is_header = true;
+
+    for line in table_str.lines() {
+        // Skip border lines (start with ┌, ├, └)
+        let first = line.chars().next().unwrap_or(' ');
+        if first == '\u{250C}' || first == '\u{251C}' || first == '\u{2514}' {
+            continue;
+        }
+        // Data line starts with │
+        if first == '\u{2502}' {
+            let cells: Vec<String> = line.split('\u{2502}')
+                .filter(|s| !s.is_empty())
+                .map(|s| s.trim().to_string())
+                .collect();
+            if is_header {
+                headers = cells;
+                is_header = false;
+            } else {
+                rows.push(cells);
+            }
+        }
+    }
+
+    // Last row is TOTAL if it starts with "TOTAL"
+    let totals = if let Some(last) = rows.last() {
+        if last.first().map(|s| s.starts_with("TOTAL")).unwrap_or(false) {
+            let t = rows.pop().unwrap();
+            Some(t)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Expand abbreviated headers for output formats
+    let headers = headers.into_iter().map(|h| match h.as_str() {
+        "Sess" => "Sessions".to_string(),
+        "Segs" => "Segments".to_string(),
+        "Est 5h Budg" => "Est 5h Budget".to_string(),
+        "Est 1w Budg" => "Est 1w Budget".to_string(),
+        _ => h,
+    }).collect();
+
+    (headers, rows, totals)
 }
 
 fn compute_cost_diffs(

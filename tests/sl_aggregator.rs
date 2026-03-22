@@ -252,7 +252,7 @@ fn test_window_aggregation_basic() {
     ];
 
     let sessions = aggregate_sessions(&records);
-    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour);
+    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour, false);
 
     assert_eq!(windows.len(), 1);
     let w = &windows[0];
@@ -281,7 +281,7 @@ fn test_window_multiple_windows() {
     ];
 
     let sessions = aggregate_sessions(&records);
-    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour);
+    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour, false);
 
     assert_eq!(windows.len(), 2);
 }
@@ -295,7 +295,7 @@ fn test_window_no_ratelimit_records_excluded() {
     ];
 
     let sessions = aggregate_sessions(&records);
-    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour);
+    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour, false);
     assert_eq!(windows.len(), 0);
 }
 
@@ -308,7 +308,7 @@ fn test_window_zero_peak_pct_no_est_budget() {
     ];
 
     let sessions = aggregate_sessions(&records);
-    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour);
+    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour, false);
     assert_eq!(windows.len(), 1);
     assert_eq!(windows[0].max_five_hour_pct, 0);
     assert!(windows[0].est_budget.is_none(), "est_budget should be None when delta_pct=0");

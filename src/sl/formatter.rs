@@ -142,30 +142,56 @@ fn display_width(s: &str) -> usize {
     width
 }
 
-/// Render a Unicode box-drawing table from headers and rows.
+/// Render a row into the output string.
+fn render_row(output: &mut String, row: &[String], col_widths: &[usize], num_cols: usize) {
+    output.push('\u{2502}');
+    for (i, cell) in row.iter().enumerate() {
+        if i >= num_cols { break; }
+        if i == 0 {
+            output.push(' ');
+            output.push_str(cell);
+            output.push_str(&" ".repeat(col_widths[i] - display_width(cell) + 1));
+        } else {
+            output.push_str(&" ".repeat(col_widths[i] - display_width(cell) + 1));
+            output.push_str(cell);
+            output.push(' ');
+        }
+        output.push('\u{2502}');
+    }
+    output.push('\n');
+}
+
+/// Render a Unicode box-drawing table from headers, rows, and an optional totals row.
 /// First column is left-aligned; remaining columns are right-aligned.
-pub fn render_table(headers: &[String], rows: &[Vec<String>], color: bool) -> String {
+pub fn render_table_with_totals(
+    headers: &[String],
+    rows: &[Vec<String>],
+    totals: Option<&Vec<String>>,
+    color: bool,
+) -> String {
     let num_cols = headers.len();
     if num_cols == 0 {
         return String::new();
     }
 
-    // Calculate column widths
+    // Calculate column widths across headers, data rows, and totals
     let mut col_widths: Vec<usize> = headers.iter().map(|h| display_width(h)).collect();
-
     for row in rows {
         for (i, cell) in row.iter().enumerate() {
             if i < num_cols {
                 let w = display_width(cell);
-                if w > col_widths[i] {
-                    col_widths[i] = w;
-                }
+                if w > col_widths[i] { col_widths[i] = w; }
             }
         }
     }
-
-    let green_start = if color { "\x1b[92m" } else { "" };
-    let green_end = if color { "\x1b[0m" } else { "" };
+    if let Some(t) = totals {
+        for (i, cell) in t.iter().enumerate() {
+            if i < num_cols {
+                let w = display_width(cell);
+                if w > col_widths[i] { col_widths[i] = w; }
+            }
+        }
+    }
 
     let mut output = String::new();
 
@@ -173,30 +199,13 @@ pub fn render_table(headers: &[String], rows: &[Vec<String>], color: bool) -> St
     output.push('\u{250C}');
     for (i, &w) in col_widths.iter().enumerate() {
         output.push_str(&"\u{2500}".repeat(w + 2));
-        if i < num_cols - 1 {
-            output.push('\u{252C}');
-        }
+        if i < num_cols - 1 { output.push('\u{252C}'); }
     }
     output.push('\u{2510}');
     output.push('\n');
 
     // Header row
-    output.push('\u{2502}');
-    for (i, header) in headers.iter().enumerate() {
-        if i == 0 {
-            // Left-aligned
-            output.push(' ');
-            output.push_str(header);
-            output.push_str(&" ".repeat(col_widths[i] - display_width(header) + 1));
-        } else {
-            // Right-aligned
-            output.push_str(&" ".repeat(col_widths[i] - display_width(header) + 1));
-            output.push_str(header);
-            output.push(' ');
-        }
-        output.push('\u{2502}');
-    }
-    output.push('\n');
+    render_row(&mut output, headers, &col_widths, num_cols);
 
     // Mid separator after header
     output.push_str(&mid_separator(&col_widths));
@@ -204,52 +213,55 @@ pub fn render_table(headers: &[String], rows: &[Vec<String>], color: bool) -> St
 
     // Data rows
     for (row_idx, row) in rows.iter().enumerate() {
-        output.push('\u{2502}');
-
-        // Check if this is a "totals" row (starts with green marker internally)
-        // We use color for all rows uniformly here — callers handle special styling
-        for (i, cell) in row.iter().enumerate() {
-            if i >= num_cols {
-                break;
-            }
-            if i == 0 {
-                // Left-aligned
-                output.push(' ');
-                output.push_str(green_start);
-                output.push_str(cell);
-                output.push_str(green_end);
-                output.push_str(&" ".repeat(col_widths[i] - display_width(cell) + 1));
-            } else {
-                // Right-aligned
-                output.push_str(&" ".repeat(col_widths[i] - display_width(cell) + 1));
-                output.push_str(green_start);
-                output.push_str(cell);
-                output.push_str(green_end);
-                output.push(' ');
-            }
-            output.push('\u{2502}');
-        }
-        output.push('\n');
-
-        // Mid separator between rows (not after the last)
+        render_row(&mut output, row, &col_widths, num_cols);
         if row_idx < rows.len() - 1 {
             output.push_str(&mid_separator(&col_widths));
             output.push('\n');
         }
     }
 
+    // Totals row (with normal separator, yellow text)
+    if let Some(t) = totals {
+        output.push_str(&mid_separator(&col_widths));
+        output.push('\n');
+        let yellow_start = if color { "\x1b[33m" } else { "" };
+        let yellow_end = if color { "\x1b[0m" } else { "" };
+        output.push('\u{2502}');
+        for (i, cell) in t.iter().enumerate() {
+            if i >= num_cols { break; }
+            if i == 0 {
+                output.push(' ');
+                output.push_str(yellow_start);
+                output.push_str(cell);
+                output.push_str(yellow_end);
+                output.push_str(&" ".repeat(col_widths[i] - display_width(cell) + 1));
+            } else {
+                output.push_str(&" ".repeat(col_widths[i] - display_width(cell) + 1));
+                output.push_str(yellow_start);
+                output.push_str(cell);
+                output.push_str(yellow_end);
+                output.push(' ');
+            }
+            output.push('\u{2502}');
+        }
+        output.push('\n');
+    }
+
     // Bottom border: └─┴─┘
     output.push('\u{2514}');
     for (i, &w) in col_widths.iter().enumerate() {
         output.push_str(&"\u{2500}".repeat(w + 2));
-        if i < num_cols - 1 {
-            output.push('\u{2534}');
-        }
+        if i < num_cols - 1 { output.push('\u{2534}'); }
     }
     output.push('\u{2518}');
     output.push('\n');
 
     output
+}
+
+/// Render a table without totals row.
+pub fn render_table(headers: &[String], rows: &[Vec<String>], color: bool) -> String {
+    render_table_with_totals(headers, rows, None, color)
 }
 
 fn mid_separator(col_widths: &[usize]) -> String {
@@ -272,22 +284,23 @@ pub fn format_sl_ratelimit_table(entries: &[SlRateLimitEntry], opts: &SlFormatOp
     let tz = opts.tz.as_deref();
 
     let headers: Vec<String> = if opts.compact {
-        vec!["Time".to_string(), "5h%".to_string(), "1w%".to_string(), "5h Resets".to_string()]
+        vec!["Time".to_string(), "Cost".to_string(), "5h%".to_string(), "1w%".to_string(), "5h Resets".to_string()]
     } else {
-        vec!["Time".to_string(), "5h%".to_string(), "1w%".to_string(), "5h Resets".to_string(), "Session".to_string()]
+        vec!["Time".to_string(), "Cost".to_string(), "5h%".to_string(), "1w%".to_string(), "5h Resets".to_string(), "Session".to_string()]
     };
 
     let rows: Vec<Vec<String>> = entries
         .iter()
         .map(|e| {
+            let cost_str = format_cost(e.cost_delta, opts.price_mode);
             let mut row = vec![
                 fmt_time_short(&e.ts, tz),
+                cost_str,
                 format!("{}%", e.five_hour_pct),
                 format!("{}%", e.seven_day_pct),
                 fmt_time_short(&e.five_hour_resets_at, tz),
             ];
             if !opts.compact {
-                // First 8 chars of session_id
                 let sess = if e.session_id.len() > 8 {
                     e.session_id[..8].to_string()
                 } else {
@@ -299,7 +312,19 @@ pub fn format_sl_ratelimit_table(entries: &[SlRateLimitEntry], opts: &SlFormatOp
         })
         .collect();
 
-    render_table(&headers, &rows, opts.color)
+    let total_cost: f64 = entries.iter().map(|e| e.cost_delta).sum();
+    let mut totals = vec![
+        "TOTAL".to_string(),
+        format_cost(total_cost, opts.price_mode),
+        String::new(),
+        String::new(),
+        String::new(),
+    ];
+    if !opts.compact {
+        totals.push(String::new());
+    }
+
+    render_table_with_totals(&headers, &rows, Some(&totals), opts.color)
 }
 
 // ─── Unified table helpers ────────────────────────────────────────────────────
@@ -335,6 +360,25 @@ fn fmt_pct_range(min: Option<u8>, max: Option<u8>) -> String {
     }
 }
 
+/// Format lines added/removed with color: green for +N (N>0), red for -N (N>0).
+fn fmt_lines(added: u64, removed: u64, color: bool) -> String {
+    let green = if color { "\x1b[32m" } else { "" };
+    let red = if color { "\x1b[31m" } else { "" };
+    let reset = if color { "\x1b[0m" } else { "" };
+
+    let add_str = if added > 0 && color {
+        format!("{}+{}{}", green, added, reset)
+    } else {
+        format!("+{}", added)
+    };
+    let rem_str = if removed > 0 && color {
+        format!("{}-{}{}", red, removed, reset)
+    } else {
+        format!("-{}", removed)
+    };
+    format!("{} {}", add_str, rem_str)
+}
+
 /// Build a unified row for any sl --per view.
 fn build_unified_row(
     label: String,
@@ -351,6 +395,7 @@ fn build_unified_row(
     price_mode: PriceMode,
     compact: bool,
     extra: Option<String>,
+    color: bool,
 ) -> Vec<String> {
     let cost_str = format_cost(cost, price_mode);
     let duration_str = fmt_duration(duration_ms);
@@ -362,7 +407,7 @@ fn build_unified_row(
         row.push(fmt_pct_range(min_5h, max_5h));
     } else {
         let api_time_str = fmt_duration(api_duration_ms);
-        let lines_str = format!("+{} -{}", lines_added, lines_removed);
+        let lines_str = fmt_lines(lines_added, lines_removed, color);
 
         row.push(api_time_str);
         row.push(lines_str);
@@ -408,18 +453,36 @@ pub fn format_sl_session_table(sessions: &[SlSessionSummary], opts: &SlFormatOpt
                 opts.price_mode,
                 opts.compact,
                 None,
+                opts.color,
             )
         })
         .collect();
 
-    render_table(&headers, &rows, opts.color)
+    let total_cost: f64 = sessions.iter().map(|s| s.total_cost).sum();
+    let total_dur: u64 = sessions.iter().map(|s| s.total_duration_ms).sum();
+    let total_api: u64 = sessions.iter().map(|s| s.total_api_duration_ms).sum();
+    let total_added: u64 = sessions.iter().map(|s| s.total_lines_added).sum();
+    let total_removed: u64 = sessions.iter().map(|s| s.total_lines_removed).sum();
+    let total_segs: u32 = sessions.iter().map(|s| s.segments).sum();
+    let min_5h = sessions.iter().filter_map(|s| s.min_five_hour_pct).min();
+    let max_5h = sessions.iter().filter_map(|s| s.max_five_hour_pct).max();
+    let min_7d = sessions.iter().filter_map(|s| s.min_seven_day_pct).min();
+    let max_7d = sessions.iter().filter_map(|s| s.max_seven_day_pct).max();
+    let totals = build_unified_row(
+        "TOTAL".to_string(), total_cost, total_dur, total_api,
+        total_added, total_removed, total_segs,
+        min_5h, max_5h, min_7d, max_7d,
+        opts.price_mode, opts.compact, None, opts.color,
+    );
+
+    render_table_with_totals(&headers, &rows, Some(&totals), opts.color)
 }
 
 // ─── Project table ────────────────────────────────────────────────────────────
 
 /// Format project summaries as a table.
 pub fn format_sl_project_table(projects: &[SlProjectSummary], opts: &SlFormatOptions) -> String {
-    let headers = unified_headers("Project", "Sessions", opts.compact, None);
+    let headers = unified_headers("Project", "Sess", opts.compact, None);
 
     let rows: Vec<Vec<String>> = projects
         .iter()
@@ -439,18 +502,36 @@ pub fn format_sl_project_table(projects: &[SlProjectSummary], opts: &SlFormatOpt
                 opts.price_mode,
                 opts.compact,
                 None,
+                opts.color,
             )
         })
         .collect();
 
-    render_table(&headers, &rows, opts.color)
+    let total_cost: f64 = projects.iter().map(|p| p.total_cost).sum();
+    let total_dur: u64 = projects.iter().map(|p| p.total_duration_ms).sum();
+    let total_api: u64 = projects.iter().map(|p| p.total_api_duration_ms).sum();
+    let total_added: u64 = projects.iter().map(|p| p.total_lines_added).sum();
+    let total_removed: u64 = projects.iter().map(|p| p.total_lines_removed).sum();
+    let total_sess: u32 = projects.iter().map(|p| p.session_count).sum();
+    let min_5h = projects.iter().filter_map(|p| p.min_five_hour_pct).min();
+    let max_5h = projects.iter().filter_map(|p| p.max_five_hour_pct).max();
+    let min_7d = projects.iter().filter_map(|p| p.min_seven_day_pct).min();
+    let max_7d = projects.iter().filter_map(|p| p.max_seven_day_pct).max();
+    let totals = build_unified_row(
+        "TOTAL".to_string(), total_cost, total_dur, total_api,
+        total_added, total_removed, total_sess,
+        min_5h, max_5h, min_7d, max_7d,
+        opts.price_mode, opts.compact, None, opts.color,
+    );
+
+    render_table_with_totals(&headers, &rows, Some(&totals), opts.color)
 }
 
 // ─── Day table ────────────────────────────────────────────────────────────────
 
 /// Format day summaries as a table.
 pub fn format_sl_day_table(days: &[SlDaySummary], opts: &SlFormatOptions) -> String {
-    let headers = unified_headers("Date", "Sessions", opts.compact, None);
+    let headers = unified_headers("Date", "Sess", opts.compact, None);
 
     let rows: Vec<Vec<String>> = days
         .iter()
@@ -470,20 +551,53 @@ pub fn format_sl_day_table(days: &[SlDaySummary], opts: &SlFormatOptions) -> Str
                 opts.price_mode,
                 opts.compact,
                 None,
+                opts.color,
             )
         })
         .collect();
 
-    render_table(&headers, &rows, opts.color)
+    let total_cost: f64 = days.iter().map(|d| d.total_cost).sum();
+    let total_dur: u64 = days.iter().map(|d| d.total_duration_ms).sum();
+    let total_api: u64 = days.iter().map(|d| d.total_api_duration_ms).sum();
+    let total_added: u64 = days.iter().map(|d| d.total_lines_added).sum();
+    let total_removed: u64 = days.iter().map(|d| d.total_lines_removed).sum();
+    let min_5h = days.iter().filter_map(|d| d.min_five_hour_pct).min();
+    let max_5h = days.iter().filter_map(|d| d.max_five_hour_pct).max();
+    let min_7d = days.iter().filter_map(|d| d.min_seven_day_pct).min();
+    let max_7d = days.iter().filter_map(|d| d.max_seven_day_pct).max();
+    let mut totals = build_unified_row(
+        "TOTAL".to_string(), total_cost, total_dur, total_api,
+        total_added, total_removed, 0,
+        min_5h, max_5h, min_7d, max_7d,
+        opts.price_mode, opts.compact, None, opts.color,
+    );
+    // Replace Sess count with "—" (sessions may span days)
+    let sess_idx = if opts.compact { 3 } else { 5 };
+    totals[sess_idx] = "\u{2014}".to_string();
+
+    render_table_with_totals(&headers, &rows, Some(&totals), opts.color)
 }
 
 // ─── Window table ─────────────────────────────────────────────────────────────
 
 /// Format window summaries as a table.
-pub fn format_sl_window_table(windows: &[SlWindowSummary], opts: &SlFormatOptions, window_label: &str) -> String {
+pub fn format_sl_window_table(
+    windows: &[SlWindowSummary],
+    opts: &SlFormatOptions,
+    window_label: &str,
+    est_budget_label: &str,
+) -> String {
     let tz = opts.tz.as_deref();
+    let is_1h = window_label == "1h Window";
 
-    let headers = unified_headers(window_label, "Sessions", opts.compact, Some("Est Budget"));
+    // Build headers: for 1h view, insert 5h Resets before Est 5h Budg
+    let headers = if is_1h && !opts.compact {
+        let mut h = unified_headers(window_label, "Sess", opts.compact, Some("5h Resets"));
+        h.push(est_budget_label.to_string());
+        h
+    } else {
+        unified_headers(window_label, "Sess", opts.compact, Some(est_budget_label))
+    };
 
     let rows: Vec<Vec<String>> = windows
         .iter()
@@ -498,7 +612,19 @@ pub fn format_sl_window_table(windows: &[SlWindowSummary], opts: &SlFormatOption
                 None => "\u{2014}".to_string(),
             };
 
-            build_unified_row(
+            // For 1h: extra = 5h Resets, then append Est Budget
+            // For others: extra = Est Budget
+            let (extra, trailing) = if is_1h && !opts.compact {
+                let resets_str = match &w.five_hour_resets_at {
+                    Some(r) => fmt_time_short(r, tz),
+                    None => "\u{2014}".to_string(),
+                };
+                (Some(resets_str), Some(est_budget_str))
+            } else {
+                (Some(est_budget_str), None)
+            };
+
+            let mut row = build_unified_row(
                 window_str,
                 w.total_cost,
                 w.total_duration_ms,
@@ -512,12 +638,47 @@ pub fn format_sl_window_table(windows: &[SlWindowSummary], opts: &SlFormatOption
                 w.max_seven_day_pct,
                 opts.price_mode,
                 opts.compact,
-                Some(est_budget_str),
-            )
+                extra,
+                opts.color,
+            );
+            if let Some(t) = trailing {
+                row.push(t);
+            }
+            row
         })
         .collect();
 
-    render_table(&headers, &rows, opts.color)
+    let total_cost: f64 = windows.iter().map(|w| w.total_cost).sum();
+    let total_dur: u64 = windows.iter().map(|w| w.total_duration_ms).sum();
+    let total_api: u64 = windows.iter().map(|w| w.total_api_duration_ms).sum();
+    let total_added: u64 = windows.iter().map(|w| w.total_lines_added).sum();
+    let total_removed: u64 = windows.iter().map(|w| w.total_lines_removed).sum();
+    let min_5h = windows.iter().map(|w| w.min_five_hour_pct).min();
+    let max_5h = windows.iter().map(|w| w.max_five_hour_pct).max();
+    let min_7d = windows.iter().filter_map(|w| w.min_seven_day_pct).min();
+    let max_7d = windows.iter().filter_map(|w| w.max_seven_day_pct).max();
+    // For 1h: extra = 5h Resets placeholder, then append Est Budget placeholder
+    let extra_totals = if is_1h && !opts.compact {
+        Some(String::new()) // 5h Resets placeholder
+    } else {
+        Some("\u{2014}".to_string()) // Est Budget N/A
+    };
+    let mut totals = build_unified_row(
+        "TOTAL".to_string(), total_cost, total_dur, total_api,
+        total_added, total_removed, 0,
+        min_5h, max_5h, min_7d, max_7d,
+        opts.price_mode, opts.compact,
+        extra_totals,
+        opts.color,
+    );
+    if is_1h && !opts.compact {
+        totals.push("\u{2014}".to_string()); // Est Budget N/A
+    }
+    // Replace Sess count with "—" (sessions may span windows)
+    let sess_idx = if opts.compact { 3 } else { 5 };
+    totals[sess_idx] = "\u{2014}".to_string();
+
+    render_table_with_totals(&headers, &rows, Some(&totals), opts.color)
 }
 
 // ─── Cost diff table ──────────────────────────────────────────────────────────
@@ -677,11 +838,12 @@ pub fn format_sl_csv_ratelimit(entries: &[SlRateLimitEntry], tz: Option<&str>) -
     let mut output = String::new();
 
     // Header
-    output.push_str("Time,5h%,1w%,5h Resets,1w Resets,Session\n");
+    output.push_str("Time,Cost,5h%,1w%,5h Resets,1w Resets,Session\n");
 
     for e in entries {
         let row = csv_row(&[
             fmt_time(&e.ts, tz),
+            format!("{:.6}", e.cost_delta),
             format!("{}", e.five_hour_pct),
             format!("{}", e.seven_day_pct),
             fmt_time(&e.five_hour_resets_at, tz),
@@ -726,6 +888,284 @@ pub fn format_sl_csv_sessions(sessions: &[SlSessionSummary], opts: &SlFormatOpti
     output
 }
 
+// ─── Generic format renderers (markdown, html, tsv) ──────────────────────────
+
+/// Strip ANSI escape codes from a string.
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::new();
+    let mut in_escape = false;
+    for ch in s.chars() {
+        if in_escape {
+            if ch == 'm' { in_escape = false; }
+        } else if ch == '\x1b' {
+            in_escape = true;
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+/// Render headers + rows + optional totals as a Markdown table.
+pub fn render_markdown(headers: &[String], rows: &[Vec<String>], totals: Option<&Vec<String>>) -> String {
+    let mut out = String::new();
+    // Header
+    out.push('|');
+    for h in headers { out.push_str(&format!(" {} |", h)); }
+    out.push('\n');
+    // Separator (first col left-aligned, rest right-aligned)
+    out.push('|');
+    for (i, _) in headers.iter().enumerate() {
+        if i == 0 { out.push_str(" :--- |"); }
+        else { out.push_str(" ---: |"); }
+    }
+    out.push('\n');
+    // Data rows
+    for row in rows {
+        out.push('|');
+        for cell in row { out.push_str(&format!(" {} |", strip_ansi(cell))); }
+        out.push('\n');
+    }
+    // Totals
+    if let Some(t) = totals {
+        out.push('|');
+        for cell in t { out.push_str(&format!(" **{}** |", strip_ansi(cell))); }
+        out.push('\n');
+    }
+    out
+}
+
+/// HTML-escape a string.
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+/// Render headers + rows + optional totals as a full HTML page using the ccost template.
+pub fn render_html(headers: &[String], rows: &[Vec<String>], totals: Option<&Vec<String>>) -> String {
+    let title = "ccost report";
+    let num_cols = headers.len();
+    let mut html = String::new();
+
+    // DOCTYPE and head
+    html.push_str("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>");
+    html.push_str(title);
+    html.push_str("</title>\n<style>\n");
+    html.push_str(SL_CSS);
+    html.push_str("\n</style>\n</head>\n<body>\n");
+    html.push_str("<h1><a href=\"https://github.com/toolsu/ccost\">");
+    html.push_str(title);
+    html.push_str("</a></h1>\n");
+
+    // Table
+    html.push_str("<table>\n<thead>\n<tr>\n");
+    for (i, header) in headers.iter().enumerate() {
+        html.push_str(&format!(
+            "<th class=\"sortable\" data-col=\"{}\">{}<span class=\"sort-arrow\"><svg width=\"12\" height=\"14\" viewBox=\"0 0 12 14\"><path d=\"M6 0L12 6H0z\" class=\"arrow-up\"/><path d=\"M6 14L0 8h12z\" class=\"arrow-down\"/></svg></span></th>\n",
+            i,
+            html_escape(header)
+        ));
+    }
+    html.push_str("</tr>\n</thead>\n<tbody>\n");
+
+    for row in rows {
+        html.push_str("<tr class=\"parent\">\n");
+        for cell in row {
+            html.push_str(&format!("<td>{}</td>\n", html_escape(&strip_ansi(cell))));
+        }
+        html.push_str("</tr>\n");
+    }
+
+    html.push_str("</tbody>\n<tfoot>\n");
+    if let Some(t) = totals {
+        html.push_str("<tr class=\"totals totals-main\">\n");
+        for cell in t {
+            html.push_str(&format!("<td>{}</td>\n", html_escape(&strip_ansi(cell))));
+        }
+        html.push_str("</tr>\n");
+    }
+    html.push_str("</tfoot>\n</table>\n");
+
+    // JavaScript (sort)
+    html.push_str("<script>\n");
+    html.push_str(&build_sl_js(num_cols));
+    html.push_str("\n</script>\n");
+    html.push_str("</body>\n</html>\n");
+
+    html
+}
+
+const SL_CSS: &str = r#"* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  background: #1a1816;
+  color: #e0e0e0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 2rem;
+}
+h1 {
+  color: #D4795A;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+h1 a {
+  color: #D4795A;
+  text-decoration: none;
+}
+h1 a:hover {
+  text-decoration: underline;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+th, td {
+  padding: 0.6rem 1rem;
+  border: 1px solid #333;
+  text-align: right;
+}
+th:first-child, td:first-child {
+  text-align: left;
+}
+thead th {
+  background: #2a2520;
+  color: #D4795A;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+thead th:hover {
+  background: #3a3530;
+}
+tbody, tfoot {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+}
+tbody tr.parent {
+  background: #222;
+}
+tbody tr.parent:hover {
+  background: #2a2a2a;
+}
+tfoot tr.totals {
+  background: #2a2520;
+  font-weight: bold;
+}
+tfoot tr.totals-main {
+  color: #D4795A;
+}
+.sort-arrow {
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.sort-arrow svg {
+  display: block;
+}
+.arrow-up, .arrow-down {
+  fill: #555;
+  transition: fill 0.2s;
+}
+th.sort-asc .arrow-up {
+  fill: #D4795A;
+}
+th.sort-desc .arrow-down {
+  fill: #D4795A;
+}"#;
+
+fn build_sl_js(_num_cols: usize) -> String {
+    r#"(function() {
+  const table = document.querySelector('table');
+  const thead = table.querySelector('thead');
+  const tbody = table.querySelector('tbody');
+  const ths = thead.querySelectorAll('th');
+  let sortState = {};
+
+  function parseValue(text) {
+    const cleaned = text.replace(/\(.*?\)/g, '').trim();
+    const match = cleaned.match(/^[\$]?([\d,.]+)\s*([KMGB])?$/i);
+    if (!match) return 0;
+    let num = parseFloat(match[1].replace(/,/g, ''));
+    const suffix = (match[2] || '').toUpperCase();
+    if (suffix === 'K') num *= 1e3;
+    else if (suffix === 'M') num *= 1e6;
+    else if (suffix === 'G' || suffix === 'B') num *= 1e9;
+    return num;
+  }
+
+  function getCellValue(row, col) {
+    const cells = row.querySelectorAll('td');
+    if (col >= cells.length) return '';
+    return cells[col].textContent || '';
+  }
+
+  const originalRows = Array.from(tbody.querySelectorAll('tr')).map((r, i) => ({ row: r, index: i }));
+
+  ths.forEach((th, colIdx) => {
+    th.addEventListener('click', () => {
+      const prev = sortState[colIdx] || 'none';
+      let next;
+      if (prev === 'none') next = 'asc';
+      else if (prev === 'asc') next = 'desc';
+      else next = 'none';
+
+      ths.forEach(t => { t.classList.remove('sort-asc', 'sort-desc'); });
+      sortState = {};
+
+      if (next !== 'none') {
+        sortState[colIdx] = next;
+        th.classList.add('sort-' + next);
+      }
+
+      let items = originalRows.map(r => ({ ...r }));
+
+      if (next !== 'none') {
+        items.sort((a, b) => {
+          const aText = getCellValue(a.row, colIdx);
+          const bText = getCellValue(b.row, colIdx);
+          const aNum = parseValue(aText);
+          const bNum = parseValue(bText);
+          const aIsNum = aNum !== 0 || /^\$?0/.test(aText.trim());
+          const bIsNum = bNum !== 0 || /^\$?0/.test(bText.trim());
+          let cmp;
+          if (aIsNum && bIsNum) cmp = aNum - bNum;
+          else cmp = aText.localeCompare(bText);
+          return next === 'desc' ? -cmp : cmp;
+        });
+      }
+
+      while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+      for (const item of items) {
+        tbody.appendChild(item.row);
+      }
+    });
+  });
+})();"#.to_string()
+}
+
+/// Render headers + rows + optional totals as TSV.
+pub fn render_tsv(headers: &[String], rows: &[Vec<String>], totals: Option<&Vec<String>>) -> String {
+    let mut out = String::new();
+    out.push_str(&headers.join("\t"));
+    out.push('\n');
+    for row in rows {
+        let clean: Vec<String> = row.iter().map(|c| strip_ansi(c)).collect();
+        out.push_str(&clean.join("\t"));
+        out.push('\n');
+    }
+    if let Some(t) = totals {
+        let clean: Vec<String> = t.iter().map(|c| strip_ansi(c)).collect();
+        out.push_str(&clean.join("\t"));
+        out.push('\n');
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -742,6 +1182,7 @@ mod tests {
         SlRateLimitEntry {
             ts: Utc.timestamp_opt(ts_secs, 0).single().unwrap(),
             session_id: session_id.to_string(),
+            cost_delta: 0.0,
             five_hour_pct,
             five_hour_resets_at: Utc.timestamp_opt(five_hour_resets_secs, 0).single().unwrap(),
             seven_day_pct,
@@ -801,6 +1242,78 @@ mod tests {
         assert_eq!(fmt_duration(3660_000), "1h 1m");
         assert_eq!(fmt_duration(7200_000), "2h 0m");
         assert_eq!(fmt_duration(7320_000), "2h 2m");
+    }
+
+    #[test]
+    fn test_fmt_lines_colored_nonzero() {
+        let result = fmt_lines(100, 50, true);
+        assert!(result.contains("\x1b[32m+100\x1b[0m"), "added should be green");
+        assert!(result.contains("\x1b[31m-50\x1b[0m"), "removed should be red");
+    }
+
+    #[test]
+    fn test_fmt_lines_zero_no_color() {
+        let result = fmt_lines(0, 0, true);
+        // +0 and -0 should NOT have color codes
+        assert_eq!(result, "+0 -0");
+        assert!(!result.contains("\x1b["), "zero values should not have ANSI codes");
+    }
+
+    #[test]
+    fn test_fmt_lines_mixed_zero_nonzero() {
+        let result = fmt_lines(42, 0, true);
+        assert!(result.contains("\x1b[32m+42\x1b[0m"), "nonzero added should be green");
+        assert!(result.contains(" -0"), "zero removed should be plain");
+        assert!(!result.contains("\x1b[31m"), "zero removed should not be red");
+
+        let result2 = fmt_lines(0, 7, true);
+        assert!(result2.contains("+0 "), "zero added should be plain");
+        assert!(result2.contains("\x1b[31m-7\x1b[0m"), "nonzero removed should be red");
+    }
+
+    #[test]
+    fn test_fmt_lines_no_color_flag() {
+        let result = fmt_lines(100, 50, false);
+        assert_eq!(result, "+100 -50");
+        assert!(!result.contains("\x1b["), "color=false should have no ANSI codes");
+    }
+
+    #[test]
+    fn test_total_row_lines_colored() {
+        // TOTAL row should have green/red lines when values are nonzero
+        let sessions = vec![
+            make_session_summary("s1", "/proj/a", 1.0, 1000, 500, 100, 50, None, 1),
+        ];
+        let opts = SlFormatOptions {
+            tz: Some("UTC".to_string()),
+            price_mode: PriceMode::Decimal,
+            compact: false,
+            color: true,
+        };
+        let result = format_sl_session_table(&sessions, &opts);
+        // The TOTAL row should contain green +100 and red -50
+        assert!(result.contains("\x1b[32m+100\x1b[0m"), "TOTAL should have green +lines");
+        assert!(result.contains("\x1b[31m-50\x1b[0m"), "TOTAL should have red -lines");
+    }
+
+    #[test]
+    fn test_total_row_zero_lines_no_extra_color() {
+        // TOTAL row with +0 -0 should not have green/red — stays yellow from row wrapper
+        let sessions = vec![
+            make_session_summary("s1", "/proj/a", 1.0, 1000, 500, 0, 0, None, 1),
+        ];
+        let opts = SlFormatOptions {
+            tz: Some("UTC".to_string()),
+            price_mode: PriceMode::Decimal,
+            compact: false,
+            color: true,
+        };
+        let result = format_sl_session_table(&sessions, &opts);
+        // Find the TOTAL row line
+        let total_line = result.lines().find(|l| l.contains("TOTAL")).unwrap();
+        // Should contain +0 -0 wrapped in yellow only, no green/red
+        assert!(!total_line.contains("\x1b[32m+0"), "zero +lines should not be green in TOTAL");
+        assert!(!total_line.contains("\x1b[31m-0"), "zero -lines should not be red in TOTAL");
     }
 
     #[test]
@@ -988,6 +1501,7 @@ mod tests {
             total_lines_removed: 5,
             min_seven_day_pct: Some(60),
             max_seven_day_pct: Some(60),
+            five_hour_resets_at: None,
         }];
         let meta = SlJsonMeta {
             source: "test".to_string(),
@@ -1012,7 +1526,7 @@ mod tests {
         )];
         let result = format_sl_csv_ratelimit(&entries, Some("UTC"));
         let first_line = result.lines().next().unwrap();
-        assert_eq!(first_line, "Time,5h%,1w%,5h Resets,1w Resets,Session");
+        assert_eq!(first_line, "Time,Cost,5h%,1w%,5h Resets,1w Resets,Session");
     }
 
     #[test]

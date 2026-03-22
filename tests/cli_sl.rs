@@ -155,7 +155,7 @@ fn test_sl_per_session() {
         .stdout(predicate::str::contains("$2.50"));
 }
 
-/// 3. --per window shows "5h%" and "Est Budget" column headers.
+/// 3. --per window shows "5h%" and "Est 5h Budg" column headers.
 #[test]
 fn test_sl_per_window() {
     let f = create_test_file();
@@ -166,7 +166,7 @@ fn test_sl_per_window() {
         .assert()
         .success()
         .stdout(predicate::str::contains("5h%"))
-        .stdout(predicate::str::contains("Est Budget"));
+        .stdout(predicate::str::contains("Est 5h Budg"));
 }
 
 /// 4. --chart 5h prints "5-Hour Rate Limit" in output.
@@ -279,7 +279,7 @@ fn test_sl_session_filter() {
         .stdout(predicate::str::contains("sess-bbb").not());
 }
 
-/// 10. --per day shows "Date" and "Sessions" column headers.
+/// 10. --per day shows "Date" and "Sess" column headers.
 #[test]
 fn test_sl_per_day() {
     let f = create_test_file();
@@ -290,10 +290,10 @@ fn test_sl_per_day() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Date"))
-        .stdout(predicate::str::contains("Sessions"));
+        .stdout(predicate::str::contains("Sess"));
 }
 
-/// 11. --per project shows "Project" and "Sessions" column headers.
+/// 11. --per project shows "Project" and "Sess" column headers.
 #[test]
 fn test_sl_per_project() {
     let f = create_test_file();
@@ -304,5 +304,188 @@ fn test_sl_per_project() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Project"))
-        .stdout(predicate::str::contains("Sessions"));
+        .stdout(predicate::str::contains("Sess"));
+}
+
+/// 12. --per 1h shows "1h Window", "5h Resets", and "Est 5h Budg" columns.
+#[test]
+fn test_sl_per_1h() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "1h", "--table", "full"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1h Window"))
+        .stdout(predicate::str::contains("5h Resets"))
+        .stdout(predicate::str::contains("Est 5h Budg"));
+}
+
+/// 13. --per 1w shows "1w Window" and "Est 1w Budg".
+#[test]
+fn test_sl_per_1w() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "1w"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1w Window"))
+        .stdout(predicate::str::contains("Est 1w Budg"));
+}
+
+/// 14. --per action shows Cost column.
+#[test]
+fn test_sl_per_action_has_cost() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "action"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Cost"))
+        .stdout(predicate::str::contains("5h%"));
+}
+
+/// 15. All tables have a TOTAL row.
+#[test]
+fn test_sl_total_row_session() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "session"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("TOTAL"));
+}
+
+#[test]
+fn test_sl_total_row_5h() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "5h"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("TOTAL"));
+}
+
+#[test]
+fn test_sl_total_row_action() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "action"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("TOTAL"));
+}
+
+/// 16. --nopromo flag is accepted.
+#[test]
+fn test_sl_nopromo_flag() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "5h", "--nopromo"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("5h Window"));
+}
+
+/// 17. --output html produces full HTML page matching main CLI template.
+#[test]
+fn test_sl_output_html() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args(["sl", "--file", path, "--per", "5h", "--output", "html", "--filename", "/dev/stdout"])
+        .output()
+        .expect("run command");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("<!DOCTYPE html>"), "should be full HTML page");
+    assert!(stdout.contains("ccost report"), "should have title");
+    assert!(stdout.contains("<style>"), "should have embedded CSS");
+    assert!(stdout.contains("<script>"), "should have embedded JS");
+    assert!(stdout.contains("background: #1a1816"), "should have dark theme CSS");
+    assert!(stdout.contains("class=\"sortable\""), "should have sortable columns");
+    assert!(stdout.contains("<thead>"), "should contain <thead>");
+    assert!(stdout.contains("<tfoot>"), "should contain <tfoot>");
+    assert!(stdout.contains("class=\"totals totals-main\""), "should have totals class");
+    assert!(stdout.contains("TOTAL"), "should contain TOTAL in tfoot");
+}
+
+/// 18. --output markdown produces valid Markdown table.
+#[test]
+fn test_sl_output_markdown() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args(["sl", "--file", path, "--per", "session", "--output", "markdown", "--filename", "/dev/stdout"])
+        .output()
+        .expect("run command");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("| Session |"), "should have markdown header");
+    assert!(stdout.contains("Segments"), "should use full 'Segments' not 'Segs'");
+    assert!(stdout.contains("| :--- |"), "should have alignment row");
+    assert!(stdout.contains("**TOTAL**"), "should have bold TOTAL");
+}
+
+/// 19. --output tsv produces tab-separated output.
+#[test]
+fn test_sl_output_tsv() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args(["sl", "--file", path, "--per", "day", "--output", "tsv", "--filename", "/dev/stdout"])
+        .output()
+        .expect("run command");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let first_line = stdout.lines().next().unwrap();
+    assert!(first_line.contains('\t'), "TSV should be tab-separated");
+    assert!(first_line.contains("Date"), "TSV header should contain Date");
+    assert!(stdout.contains("TOTAL"), "TSV should have TOTAL row");
+}
+
+/// 20. --output invalid format should fail.
+#[test]
+fn test_sl_output_invalid_format() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--output", "xml"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid format"));
+}
+
+/// 21. --per 1h --output html works with 5h Resets column.
+#[test]
+fn test_sl_1h_output_html() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args(["sl", "--file", path, "--per", "1h", "--output", "html", "--filename", "/dev/stdout"])
+        .output()
+        .expect("run command");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("5h Resets"), "1h HTML should have 5h Resets column");
+    assert!(stdout.contains("Est 5h Budget"), "1h HTML should have full 'Est 5h Budget'");
+    assert!(stdout.contains("Sessions"), "1h HTML should use full 'Sessions' not 'Sess'");
 }

@@ -20,6 +20,7 @@ fn make_ratelimit_entry(
         five_hour_resets_at: Utc.timestamp_opt(five_hour_resets_secs, 0).single().unwrap(),
         seven_day_pct,
         seven_day_resets_at: Utc.timestamp_opt(seven_day_resets_secs, 0).single().unwrap(),
+        cost_delta: 0.0,
     }
 }
 
@@ -478,6 +479,7 @@ fn test_json_windows_structure() {
         total_lines_removed: 5,
         min_seven_day_pct: Some(60),
         max_seven_day_pct: Some(60),
+        five_hour_resets_at: None,
     }];
     let meta = make_json_meta("windows");
     let result = format_sl_json_windows(&windows, &meta);
@@ -542,7 +544,7 @@ fn test_csv_ratelimit_header_row() {
     let entries = vec![];
     let result = format_sl_csv_ratelimit(&entries, Some("UTC"));
     let first_line = result.lines().next().expect("should have header line");
-    assert_eq!(first_line, "Time,5h%,1w%,5h Resets,1w Resets,Session");
+    assert_eq!(first_line, "Time,Cost,5h%,1w%,5h Resets,1w Resets,Session");
 }
 
 #[test]

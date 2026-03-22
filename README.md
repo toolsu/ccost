@@ -182,24 +182,26 @@ If you are already using a `~/.claude/statusline.sh`, just add `echo "{\"ts\":$(
 
 | Usage | Description |
 |-------|-------------|
-| `ccost sl` | Session summaries (default) |
-| `ccost sl --per action` | Rate limit timeline — shows 5h% and 1w% changes per action |
-| `ccost sl --per session` | Group by session (same as default) |
+| `ccost sl` | 5-hour windows (default) |
+| `ccost sl --per action` | Rate limit timeline — shows cost, 5h% and 1w% changes per action |
+| `ccost sl --per session` | Group by session |
 | `ccost sl --per project` | Group by project |
 | `ccost sl --per day` | Group by day |
-| `ccost sl --per 5h` | Group by 5-hour rate-limit window (adds Est Budget column) |
-| `ccost sl --per 1w` | Group by 1-week rate-limit window (adds Est Budget column) |
+| `ccost sl --per 1h` | Group by 1-hour windows within 5h windows (adds Est 5h Budg + 5h Resets columns) |
+| `ccost sl --per 5h` | Group by 5-hour rate-limit window (adds Est 5h Budg column) |
+| `ccost sl --per 1w` | Group by 1-week rate-limit window (adds Est 1w Budg column) |
 | `ccost sl --chart 5h` | 5-hour rate limit percentage chart |
 | `ccost sl --chart 1w` | 1-week rate limit percentage chart |
 | `ccost sl --chart cost` | Cumulative cost chart |
 
-All `--per` views share the same columns: `Cost`, `Duration`, `API Time`, `Lines +/-`, `Sessions`, `5h%`, `1w%`. Only the first column (the grouping label) changes. `--per 5h` / `--per 1w` add an extra `Est Budget` column. The `5h%` and `1w%` columns show min–max ranges (e.g. `1–29%`).
+All `--per` views share the same columns: `Cost`, `Duration`, `API Time`, `Lines +/-`, `Sess`, `5h%`, `1w%`. Only the first column (the grouping label) changes. `--per 1h` / `--per 5h` add `Est 5h Budg`; `--per 1w` adds `Est 1w Budg`; `--per 1h` also adds `5h Resets`. The `5h%` and `1w%` columns show min–max ranges (e.g. `1–29%`).
 
 ### Statusline-Specific Flags
 
 | Flag | Description |
 |------|-------------|
 | `--file <path>` | Statusline file path. Default: `~/.claude/statusline.jsonl`. |
+| `--nopromo` | Disable promo adjustment for Est Budget (default: adjusts for known 2x promo periods). See [Promo Adjustment](#promo-adjustment). |
 | `--cost-diff` | Compare statusline self-reported cost with LiteLLM-calculated cost. Only with `--per session`. |
 
 All shared flags (`--from`, `--to`, `--tz`, `--session`, `--project`, `--model`, `--cost`, `--output`, `--filename`, `--copy`, `--order`, `--table`, `--5hfrom`, `--5hto`, `--1wfrom`, `--1wto`) work with `ccost sl`.
@@ -220,13 +222,30 @@ Rate limits are account-level and do NOT reset with sessions.
 
 ### Budget Estimation
 
-The `--per 5h` view estimates total 5-hour budget from actual cost and rate limit percentage:
+The `--per 1h`, `--per 5h`, and `--per 1w` views estimate total budget from actual cost and rate limit percentage delta:
 
 ```
-Est Budget = Cost in Window × 100 / Δ5h%
+Est 5h Budg = Cost in Window × 100 / Δ5h%
+Est 1w Budg = Cost in Window × 100 / Δ1w%
 ```
 
-Where `Δ5h% = max 5h% − min 5h%` within that window. This uses the delta (how much rate limit was consumed during the window) rather than the absolute peak, giving a more accurate estimate. If this number decreases over time, it may indicate quota reduction.
+Where `Δ5h% = max 5h% − min 5h%` within that window. This uses the delta (how much rate limit was consumed during the window) rather than the absolute peak, giving a more accurate estimate.
+
+**Limitation:** `ccost sl` only has access to Claude Code cost data. Usage from other Claude products (claude.ai web, Claude Desktop/Mobile App, Claude Code web, etc.) also contributes to the rate limit percentage but is not reflected in the cost. This causes Est Budget to be **underestimated**: the numerator (CC cost only) is too small while the denominator (Δ5h% from all products) is too large. The degree of underestimation is proportional to how much non-Claude-Code usage occurred during the window.
+
+### Promo Adjustment
+
+By default, `ccost sl` adjusts budget estimates for known double-usage (2x) promotional periods. During these promos, the rate limit budget is effectively doubled, so the same dollar amount consumes half the rate limit percentage. Use `--nopromo` to disable this adjustment:
+
+```sh
+ccost sl --per 5h --nopromo
+```
+
+The following promo periods are built in (all UTC):
+- **2025-12-24 to 2025-12-31**: Full week double usage
+- **2026-03-10 to 2026-03-26**: Intermittent double usage windows during March 2026
+
+For windows that partially overlap with a promo period, the adjustment is proportional to the overlap fraction.
 
 ## Examples
 

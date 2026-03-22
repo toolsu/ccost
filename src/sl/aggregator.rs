@@ -140,8 +140,65 @@ fn compute_segment_totals(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowType {
+    OneHour,
     FiveHour,
     OneWeek,
+}
+
+// ─── Promo intervals (2x usage) ─────────────────────────────────────────────
+
+/// 2025-12 and 2026-03 Claude double-usage promo intervals (UTC timestamps, start inclusive, end exclusive).
+const PROMO_INTERVALS: &[(i64, i64)] = &[
+    (1766620800, 1767225600),
+    (1773374400, 1773403200),
+    (1773424800, 1773662400),
+    (1773684000, 1773748800),
+    (1773770400, 1773835200),
+    (1773856800, 1773921600),
+    (1773943200, 1774008000),
+    (1774029600, 1774267200),
+    (1774288800, 1774353600),
+    (1774375200, 1774440000),
+    (1774461600, 1774526400),
+    (1774548000, 1774612800),
+    (1774634400, 1774756800),
+];
+
+/// Compute the fraction of time range [start, end) that overlaps with promo intervals.
+pub fn promo_overlap_ratio(start_ts: i64, end_ts: i64) -> f64 {
+    let window_dur = end_ts - start_ts;
+    if window_dur <= 0 {
+        return 0.0;
+    }
+    let mut overlap = 0_i64;
+    for &(ps, pe) in PROMO_INTERVALS {
+        let os = start_ts.max(ps);
+        let oe = end_ts.min(pe);
+        if oe > os {
+            overlap += oe - os;
+        }
+    }
+    overlap as f64 / window_dur as f64
+}
+
+/// Compute promo-adjusted est_budget. During promo, delta_pct represents half the
+/// normal rate (budget is doubled), so we scale the delta up to get the normal budget.
+fn compute_est_budget(total_cost: f64, delta_pct: u16, promo: bool, window_start_ts: i64, window_end_ts: i64) -> Option<f64> {
+    if delta_pct == 0 {
+        return None;
+    }
+    let adjustment = if promo {
+        let ratio = promo_overlap_ratio(window_start_ts, window_end_ts);
+        1.0 + ratio // ranges from 1.0 (no promo) to 2.0 (full promo)
+    } else {
+        1.0
+    };
+    let adjusted_delta = delta_pct as f64 * adjustment;
+    if adjusted_delta > 0.0 {
+        Some(total_cost * 100.0 / adjusted_delta)
+    } else {
+        None
+    }
 }
 
 // ─── Public aggregation functions ─────────────────────────────────────────────
@@ -200,6 +257,8 @@ pub fn aggregate_sessions(records: &[SlRecord]) -> Vec<SlSessionSummary> {
 pub fn aggregate_ratelimit(records: &[SlRecord]) -> Vec<SlRateLimitEntry> {
     let mut result = Vec::new();
     let mut last_pair: Option<(u8, u8)> = None;
+    // Track cumulative cost per session for delta calculation
+    let mut last_cost_by_session: BTreeMap<&str, f64> = BTreeMap::new();
 
     for rec in records {
         // All four rate-limit fields must be Some
@@ -215,14 +274,25 @@ pub fn aggregate_ratelimit(records: &[SlRecord]) -> Vec<SlRateLimitEntry> {
 
         let pair = (fh_pct, sd_pct);
         if last_pair == Some(pair) {
-            // Same as previous — skip
+            // Same as previous — update cost tracking even if we skip the entry
+            last_cost_by_session.insert(rec.session_id.as_str(), rec.cost_usd);
             continue;
         }
         last_pair = Some(pair);
 
+        // Compute cost delta
+        let prev_cost = last_cost_by_session.get(rec.session_id.as_str()).copied().unwrap_or(0.0);
+        let cost_delta = if rec.cost_usd < prev_cost {
+            rec.cost_usd // segment reset
+        } else {
+            rec.cost_usd - prev_cost
+        };
+        last_cost_by_session.insert(rec.session_id.as_str(), rec.cost_usd);
+
         result.push(SlRateLimitEntry {
             ts: rec.ts,
             session_id: rec.session_id.clone(),
+            cost_delta,
             five_hour_pct: fh_pct,
             five_hour_resets_at: fh_resets,
             seven_day_pct: sd_pct,
@@ -233,92 +303,171 @@ pub fn aggregate_ratelimit(records: &[SlRecord]) -> Vec<SlRateLimitEntry> {
     result
 }
 
-/// Group records by rate-limit window (5h or 1w) and compute window summaries.
-pub fn aggregate_windows(records: &[SlRecord], _sessions: &[SlSessionSummary], window_type: WindowType) -> Vec<SlWindowSummary> {
-    // Group records by the appropriate resets_at field
+/// Compute segment-aware totals for a session's records up to (but not including) a given time.
+fn segment_totals_before(
+    session_recs: &[&SlRecord], // must be sorted by ts
+    before: DateTime<Utc>,
+) -> (f64, u64, u64, u64, u64) {
+    let filtered: Vec<&SlRecord> = session_recs.iter()
+        .filter(|r| r.ts < before)
+        .copied()
+        .collect();
+    if filtered.is_empty() {
+        return (0.0, 0, 0, 0, 0);
+    }
+    let (_, cost, dur, api, added, removed) = compute_segment_totals(&filtered);
+    (cost, dur, api, added, removed)
+}
+
+/// Compute a single window summary.
+/// `window_recs`: records belonging to this rate-limit window (filtered by resets_at) — for pct, session count.
+/// `by_session`: ALL records per session, sorted by ts — for delta-based cost/duration computation.
+fn build_window_summary(
+    window_recs: &[&SlRecord],
+    by_session: &BTreeMap<&str, Vec<&SlRecord>>,
+    window_start: DateTime<Utc>,
+    window_end: DateTime<Utc>,
+    window_type: WindowType,
+    promo: bool,
+    five_hour_resets_at: Option<DateTime<Utc>>,
+) -> Option<SlWindowSummary> {
+    if window_recs.is_empty() {
+        return None;
+    }
+
+    // pct and session count from window_recs (correctly grouped by resets_at)
+    let five_hour_pcts: Vec<u8> = window_recs.iter().filter_map(|r| r.five_hour_pct).collect();
+    let max_five_hour_pct = five_hour_pcts.iter().copied().max().unwrap_or(0);
+    let min_five_hour_pct = five_hour_pcts.iter().copied().min().unwrap_or(0);
+
+    let seven_day_pcts: Vec<u8> = window_recs.iter().filter_map(|r| r.seven_day_pct).collect();
+    let max_seven_day_pct = seven_day_pcts.iter().copied().max();
+    let min_seven_day_pct = seven_day_pcts.iter().copied().min();
+
+    let session_ids: HashSet<&str> = window_recs.iter().map(|r| r.session_id.as_str()).collect();
+    let session_count = session_ids.len() as u32;
+
+    // Compute delta totals per session: totals_up_to(end) - totals_up_to(start)
+    let mut total_cost = 0.0_f64;
+    let mut total_duration_ms = 0_u64;
+    let mut total_api_duration_ms = 0_u64;
+    let mut total_lines_added = 0_u64;
+    let mut total_lines_removed = 0_u64;
+    for sid in &session_ids {
+        if let Some(sess_recs) = by_session.get(sid) {
+            let (c_end, d_end, a_end, la_end, lr_end) = segment_totals_before(sess_recs, window_end);
+            let (c_start, d_start, a_start, la_start, lr_start) = segment_totals_before(sess_recs, window_start);
+            total_cost += (c_end - c_start).max(0.0);
+            total_duration_ms += d_end.saturating_sub(d_start);
+            total_api_duration_ms += a_end.saturating_sub(a_start);
+            total_lines_added += la_end.saturating_sub(la_start);
+            total_lines_removed += lr_end.saturating_sub(lr_start);
+        }
+    }
+
+    let delta_pct = match window_type {
+        WindowType::OneHour | WindowType::FiveHour => {
+            max_five_hour_pct.saturating_sub(min_five_hour_pct) as u16
+        }
+        WindowType::OneWeek => {
+            let max = max_seven_day_pct.unwrap_or(0);
+            let min = min_seven_day_pct.unwrap_or(0);
+            max.saturating_sub(min) as u16
+        }
+    };
+    let est_budget = compute_est_budget(
+        total_cost, delta_pct, promo,
+        window_start.timestamp(), window_end.timestamp(),
+    );
+
+    Some(SlWindowSummary {
+        window_start,
+        window_end,
+        min_five_hour_pct,
+        max_five_hour_pct,
+        sessions: session_count,
+        total_cost,
+        est_budget,
+        total_duration_ms,
+        total_api_duration_ms,
+        total_lines_added,
+        total_lines_removed,
+        min_seven_day_pct,
+        max_seven_day_pct,
+        five_hour_resets_at,
+    })
+}
+
+/// Group records by rate-limit window (1h, 5h, or 1w) and compute window summaries.
+pub fn aggregate_windows(
+    records: &[SlRecord],
+    _sessions: &[SlSessionSummary],
+    window_type: WindowType,
+    promo: bool,
+) -> Vec<SlWindowSummary> {
+    // Pre-group ALL records by session_id, sorted by ts (for delta computation)
+    let mut by_session: BTreeMap<&str, Vec<&SlRecord>> = BTreeMap::new();
+    for rec in records {
+        by_session.entry(rec.session_id.as_str()).or_default().push(rec);
+    }
+    for recs in by_session.values_mut() {
+        recs.sort_by_key(|r| r.ts);
+    }
+
+    // Group records by resets_at (for pct and session counting)
+    let group_key = match window_type {
+        WindowType::OneHour | WindowType::FiveHour => WindowType::FiveHour,
+        WindowType::OneWeek => WindowType::OneWeek,
+    };
+
     let mut by_window: BTreeMap<i64, Vec<&SlRecord>> = BTreeMap::new();
     for rec in records {
-        let resets_at = match window_type {
+        let resets_at = match group_key {
             WindowType::FiveHour => rec.five_hour_resets_at,
             WindowType::OneWeek => rec.seven_day_resets_at,
+            _ => unreachable!(),
         };
-        if let Some(resets_at) = resets_at {
-            by_window.entry(resets_at.timestamp()).or_default().push(rec);
+        if let Some(r) = resets_at {
+            by_window.entry(r.timestamp()).or_default().push(rec);
         }
     }
 
     let mut result = Vec::new();
-    for (resets_ts, window_recs) in by_window {
-        let window_end = Utc.timestamp_opt(resets_ts, 0).single().unwrap_or_default();
-        let window_start = match window_type {
-            WindowType::FiveHour => window_end - Duration::hours(5),
-            WindowType::OneWeek => window_end - Duration::days(7),
+    for (resets_ts, window_recs) in &by_window {
+        let window_end = Utc.timestamp_opt(*resets_ts, 0).single().unwrap_or_default();
+        let parent_duration = match group_key {
+            WindowType::FiveHour => Duration::hours(5),
+            WindowType::OneWeek => Duration::days(7),
+            _ => unreachable!(),
         };
+        let window_start = window_end - parent_duration;
 
-        let five_hour_pcts: Vec<u8> = window_recs.iter().filter_map(|r| r.five_hour_pct).collect();
-        let max_five_hour_pct = five_hour_pcts.iter().copied().max().unwrap_or(0);
-        let min_five_hour_pct = five_hour_pcts.iter().copied().min().unwrap_or(0);
-
-        // Count unique sessions in this window
-        let unique_sessions: HashSet<&str> = window_recs.iter().map(|r| r.session_id.as_str()).collect();
-        let session_count = unique_sessions.len() as u32;
-
-        // Track min/max 7d%
-        let seven_day_pcts: Vec<u8> = window_recs.iter().filter_map(|r| r.seven_day_pct).collect();
-        let max_seven_day_pct = seven_day_pcts.iter().copied().max();
-        let min_seven_day_pct = seven_day_pcts.iter().copied().min();
-
-        // Mini segment detection per session within window
-        let mut by_session_window: BTreeMap<&str, Vec<&SlRecord>> = BTreeMap::new();
-        for rec in &window_recs {
-            by_session_window.entry(rec.session_id.as_str()).or_default().push(rec);
-        }
-
-        let mut total_cost = 0.0_f64;
-        let mut total_duration_ms = 0_u64;
-        let mut total_api_duration_ms = 0_u64;
-        let mut total_lines_added = 0_u64;
-        let mut total_lines_removed = 0_u64;
-        for (_, mut sess_recs) in by_session_window {
-            sess_recs.sort_by_key(|r| r.ts);
-            let (_, cost, dur, api_dur, added, removed) = compute_segment_totals(&sess_recs);
-            total_cost += cost;
-            total_duration_ms += dur;
-            total_api_duration_ms += api_dur;
-            total_lines_added += added;
-            total_lines_removed += removed;
-        }
-
-        // Use delta (max - min) for budget estimation: cost / delta% * 100
-        let delta_pct = match window_type {
-            WindowType::FiveHour => max_five_hour_pct.saturating_sub(min_five_hour_pct) as u16,
-            WindowType::OneWeek => {
-                let max = max_seven_day_pct.unwrap_or(0);
-                let min = min_seven_day_pct.unwrap_or(0);
-                max.saturating_sub(min) as u16
+        if window_type == WindowType::OneHour {
+            // Split by timestamp within the resets_at-grouped records
+            let fh_resets_at = Some(window_end);
+            for i in 0..5 {
+                let chunk_start = window_start + Duration::hours(i);
+                let chunk_end = window_start + Duration::hours(i + 1);
+                let chunk_recs: Vec<&SlRecord> = window_recs
+                    .iter()
+                    .filter(|r| r.ts >= chunk_start && r.ts < chunk_end)
+                    .copied()
+                    .collect();
+                if let Some(summary) = build_window_summary(
+                    &chunk_recs, &by_session, chunk_start, chunk_end,
+                    window_type, promo, fh_resets_at,
+                ) {
+                    result.push(summary);
+                }
             }
-        };
-        let est_budget = if delta_pct > 0 {
-            Some(total_cost * 100.0 / (delta_pct as f64))
         } else {
-            None
-        };
-
-        result.push(SlWindowSummary {
-            window_start,
-            window_end,
-            min_five_hour_pct,
-            max_five_hour_pct,
-            sessions: session_count,
-            total_cost,
-            est_budget,
-            total_duration_ms,
-            total_api_duration_ms,
-            total_lines_added,
-            total_lines_removed,
-            min_seven_day_pct,
-            max_seven_day_pct,
-        });
+            if let Some(summary) = build_window_summary(
+                window_recs, &by_session, window_start, window_end,
+                window_type, promo, None,
+            ) {
+                result.push(summary);
+            }
+        }
     }
 
     result

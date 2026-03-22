@@ -49,6 +49,7 @@ pub struct SlSessionSummary {
 pub struct SlRateLimitEntry {
     pub ts: DateTime<Utc>,
     pub session_id: String,
+    pub cost_delta: f64,
     pub five_hour_pct: u8,
     pub five_hour_resets_at: DateTime<Utc>,
     pub seven_day_pct: u8,
@@ -71,6 +72,8 @@ pub struct SlWindowSummary {
     pub total_lines_removed: u64,
     pub min_seven_day_pct: Option<u8>,
     pub max_seven_day_pct: Option<u8>,
+    /// For 1h windows: the parent 5h window's reset time
+    pub five_hour_resets_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -132,6 +135,7 @@ pub enum SlViewMode {
     Session,
     Project,
     Day,
+    Window1h,
     Window5h,
     Window1w,
 }
