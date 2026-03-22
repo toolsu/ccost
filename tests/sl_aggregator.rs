@@ -1,5 +1,5 @@
-use cctokens::sl::types::*;
-use cctokens::sl::{
+use ccost::sl::types::*;
+use ccost::sl::{
     aggregate_sessions, aggregate_ratelimit, aggregate_windows, aggregate_by_project,
     aggregate_by_day, WindowType,
 };
@@ -177,8 +177,10 @@ fn test_last_ts_fields() {
     let summaries = aggregate_sessions(&records);
     assert_eq!(summaries.len(), 1);
     let s = &summaries[0];
-    assert_eq!(s.last_five_hour_pct, Some(30));
-    assert_eq!(s.last_seven_day_pct, Some(50));
+    assert_eq!(s.min_five_hour_pct, Some(10));
+    assert_eq!(s.max_five_hour_pct, Some(30));
+    assert_eq!(s.min_seven_day_pct, Some(20));
+    assert_eq!(s.max_seven_day_pct, Some(50));
 }
 
 // ─── aggregate_ratelimit ──────────────────────────────────────────────────────
@@ -256,13 +258,14 @@ fn test_window_aggregation_basic() {
     let w = &windows[0];
     assert_eq!(w.window_end.timestamp(), resets_at);
     assert_eq!(w.window_start.timestamp(), resets_at - 5 * 3600);
-    assert_eq!(w.peak_five_hour_pct, 40);
+    assert_eq!(w.min_five_hour_pct, 30);
+    assert_eq!(w.max_five_hour_pct, 40);
     assert_eq!(w.sessions, 2);
     // total_cost = max of s1 (0.3) + max of s2 (0.5) = 0.8
     assert!((w.total_cost - 0.8).abs() < 1e-9, "total_cost={}", w.total_cost);
-    // est_budget = 0.8 * 100 / 40 = 2.0
+    // est_budget = 0.8 * 100 / (40-30) = 8.0  (delta of 5h%)
     let est = w.est_budget.unwrap();
-    assert!((est - 2.0).abs() < 1e-9, "est_budget={}", est);
+    assert!((est - 8.0).abs() < 1e-9, "est_budget={}", est);
 }
 
 #[test]
@@ -307,8 +310,8 @@ fn test_window_zero_peak_pct_no_est_budget() {
     let sessions = aggregate_sessions(&records);
     let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour);
     assert_eq!(windows.len(), 1);
-    assert_eq!(windows[0].peak_five_hour_pct, 0);
-    assert!(windows[0].est_budget.is_none(), "est_budget should be None when peak_pct=0");
+    assert_eq!(windows[0].max_five_hour_pct, 0);
+    assert!(windows[0].est_budget.is_none(), "est_budget should be None when delta_pct=0");
 }
 
 // ─── aggregate_by_project ────────────────────────────────────────────────────
@@ -329,8 +332,10 @@ fn make_session(session_id: &str, project: &str, cost: f64, dur: u64, api_dur: u
         max_context_pct: None,
         first_ts: Utc.timestamp_opt(first_ts_secs, 0).single().unwrap(),
         last_ts: Utc.timestamp_opt(first_ts_secs + 1000, 0).single().unwrap(),
-        last_five_hour_pct: None,
-        last_seven_day_pct: None,
+        min_five_hour_pct: None,
+        max_five_hour_pct: None,
+        min_seven_day_pct: None,
+        max_seven_day_pct: None,
     }
 }
 
@@ -396,8 +401,10 @@ fn make_session_with_pct(
         max_context_pct: None,
         first_ts: Utc.timestamp_opt(first_ts_secs, 0).single().unwrap(),
         last_ts: Utc.timestamp_opt(first_ts_secs + 1000, 0).single().unwrap(),
-        last_five_hour_pct: five_hour_pct,
-        last_seven_day_pct: seven_day_pct,
+        min_five_hour_pct: five_hour_pct,
+        max_five_hour_pct: five_hour_pct,
+        min_seven_day_pct: seven_day_pct,
+        max_seven_day_pct: seven_day_pct,
     }
 }
 
@@ -421,8 +428,10 @@ fn test_day_aggregation_utc() {
 
     assert!((d26.total_cost - 0.3).abs() < 1e-9, "2026-03-26 total_cost={}", d26.total_cost);
     assert_eq!(d26.session_count, 2);
-    assert_eq!(d26.peak_five_hour_pct, Some(15), "should be max of 10 and 15");
-    assert_eq!(d26.peak_seven_day_pct, Some(25), "should be max of 20 and 25");
+    assert_eq!(d26.min_five_hour_pct, Some(10), "should be min of 10 and 15");
+    assert_eq!(d26.max_five_hour_pct, Some(15), "should be max of 10 and 15");
+    assert_eq!(d26.min_seven_day_pct, Some(20), "should be min of 20 and 25");
+    assert_eq!(d26.max_seven_day_pct, Some(25), "should be max of 20 and 25");
 
     assert!((d27.total_cost - 0.3).abs() < 1e-9);
     assert_eq!(d27.session_count, 1);
@@ -452,8 +461,8 @@ fn test_day_aggregation_none_pct() {
 
     let days = aggregate_by_day(&sessions, Some("UTC"));
     assert_eq!(days.len(), 1);
-    assert_eq!(days[0].peak_five_hour_pct, None);
-    assert_eq!(days[0].peak_seven_day_pct, None);
+    assert_eq!(days[0].max_five_hour_pct, None);
+    assert_eq!(days[0].max_seven_day_pct, None);
 }
 
 #[test]

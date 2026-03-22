@@ -38,8 +38,10 @@ pub struct SlSessionSummary {
     pub max_context_pct: Option<u8>,
     pub first_ts: DateTime<Utc>,
     pub last_ts: DateTime<Utc>,
-    pub last_five_hour_pct: Option<u8>,
-    pub last_seven_day_pct: Option<u8>,
+    pub min_five_hour_pct: Option<u8>,
+    pub max_five_hour_pct: Option<u8>,
+    pub min_seven_day_pct: Option<u8>,
+    pub max_seven_day_pct: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -58,7 +60,8 @@ pub struct SlRateLimitEntry {
 pub struct SlWindowSummary {
     pub window_start: DateTime<Utc>,
     pub window_end: DateTime<Utc>,
-    pub peak_five_hour_pct: u8,
+    pub min_five_hour_pct: u8,
+    pub max_five_hour_pct: u8,
     pub sessions: u32,
     pub total_cost: f64,
     pub est_budget: Option<f64>,
@@ -66,7 +69,8 @@ pub struct SlWindowSummary {
     pub total_api_duration_ms: u64,
     pub total_lines_added: u64,
     pub total_lines_removed: u64,
-    pub peak_seven_day_pct: Option<u8>,
+    pub min_seven_day_pct: Option<u8>,
+    pub max_seven_day_pct: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -79,8 +83,10 @@ pub struct SlProjectSummary {
     pub session_count: u32,
     pub total_lines_added: u64,
     pub total_lines_removed: u64,
-    pub peak_five_hour_pct: Option<u8>,
-    pub peak_seven_day_pct: Option<u8>,
+    pub min_five_hour_pct: Option<u8>,
+    pub max_five_hour_pct: Option<u8>,
+    pub min_seven_day_pct: Option<u8>,
+    pub max_seven_day_pct: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -89,8 +95,10 @@ pub struct SlDaySummary {
     pub date: String,
     pub total_cost: f64,
     pub session_count: u32,
-    pub peak_five_hour_pct: Option<u8>,
-    pub peak_seven_day_pct: Option<u8>,
+    pub min_five_hour_pct: Option<u8>,
+    pub max_five_hour_pct: Option<u8>,
+    pub min_seven_day_pct: Option<u8>,
+    pub max_seven_day_pct: Option<u8>,
     pub total_duration_ms: u64,
     pub total_api_duration_ms: u64,
     pub total_lines_added: u64,
@@ -120,7 +128,7 @@ pub struct SlCostDiff {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SlViewMode {
-    RateLimit,
+    Action,
     Session,
     Project,
     Day,

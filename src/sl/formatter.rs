@@ -306,25 +306,33 @@ pub fn format_sl_ratelimit_table(entries: &[SlRateLimitEntry], opts: &SlFormatOp
 
 /// Build unified headers for any sl --per view.
 ///
-/// Full:    [Label] | Cost | Duration | API Time | API% | Lines +/- | [count_label] | Peak 5h% | Peak 1w% | [extra_header]
-/// Compact: [Label] | Cost | Duration | [count_label] | Peak 5h%
+/// Full:    [Label] | Cost | Duration | API Time | Lines +/- | [count_label] | 5h% | 1w% | [extra_header]
+/// Compact: [Label] | Cost | Duration | [count_label] | 5h%
 fn unified_headers(label: &str, count_label: &str, compact: bool, extra_header: Option<&str>) -> Vec<String> {
     let mut headers = vec![label.to_string(), "Cost".to_string(), "Duration".to_string()];
     if compact {
         headers.push(count_label.to_string());
-        headers.push("Peak 5h%".to_string());
+        headers.push("5h%".to_string());
     } else {
         headers.push("API Time".to_string());
-        headers.push("API%".to_string());
         headers.push("Lines +/-".to_string());
         headers.push(count_label.to_string());
-        headers.push("Peak 5h%".to_string());
-        headers.push("Peak 1w%".to_string());
+        headers.push("5h%".to_string());
+        headers.push("1w%".to_string());
     }
     if let Some(extra) = extra_header {
         headers.push(extra.to_string());
     }
     headers
+}
+
+/// Format a min–max percentage range.
+fn fmt_pct_range(min: Option<u8>, max: Option<u8>) -> String {
+    match (min, max) {
+        (Some(lo), Some(hi)) if lo == hi => format!("{}%", lo),
+        (Some(lo), Some(hi)) => format!("{}–{}%", lo, hi),
+        _ => "\u{2014}".to_string(),
+    }
 }
 
 /// Build a unified row for any sl --per view.
@@ -336,8 +344,10 @@ fn build_unified_row(
     lines_added: u64,
     lines_removed: u64,
     count: u32,
-    peak_5h: Option<u8>,
-    peak_7d: Option<u8>,
+    min_5h: Option<u8>,
+    max_5h: Option<u8>,
+    min_7d: Option<u8>,
+    max_7d: Option<u8>,
     price_mode: PriceMode,
     compact: bool,
     extra: Option<String>,
@@ -349,31 +359,16 @@ fn build_unified_row(
 
     if compact {
         row.push(count.to_string());
-        row.push(match peak_5h {
-            Some(p) => format!("{}%", p),
-            None => "\u{2014}".to_string(),
-        });
+        row.push(fmt_pct_range(min_5h, max_5h));
     } else {
         let api_time_str = fmt_duration(api_duration_ms);
-        let api_pct_str = if duration_ms > 0 {
-            format!("{:.0}%", api_duration_ms as f64 / duration_ms as f64 * 100.0)
-        } else {
-            "\u{2014}".to_string()
-        };
         let lines_str = format!("+{} -{}", lines_added, lines_removed);
 
         row.push(api_time_str);
-        row.push(api_pct_str);
         row.push(lines_str);
         row.push(count.to_string());
-        row.push(match peak_5h {
-            Some(p) => format!("{}%", p),
-            None => "\u{2014}".to_string(),
-        });
-        row.push(match peak_7d {
-            Some(p) => format!("{}%", p),
-            None => "\u{2014}".to_string(),
-        });
+        row.push(fmt_pct_range(min_5h, max_5h));
+        row.push(fmt_pct_range(min_7d, max_7d));
     }
 
     if let Some(extra_val) = extra {
@@ -406,8 +401,10 @@ pub fn format_sl_session_table(sessions: &[SlSessionSummary], opts: &SlFormatOpt
                 s.total_lines_added,
                 s.total_lines_removed,
                 s.segments,
-                s.last_five_hour_pct,
-                s.last_seven_day_pct,
+                s.min_five_hour_pct,
+                s.max_five_hour_pct,
+                s.min_seven_day_pct,
+                s.max_seven_day_pct,
                 opts.price_mode,
                 opts.compact,
                 None,
@@ -435,8 +432,10 @@ pub fn format_sl_project_table(projects: &[SlProjectSummary], opts: &SlFormatOpt
                 p.total_lines_added,
                 p.total_lines_removed,
                 p.session_count,
-                p.peak_five_hour_pct,
-                p.peak_seven_day_pct,
+                p.min_five_hour_pct,
+                p.max_five_hour_pct,
+                p.min_seven_day_pct,
+                p.max_seven_day_pct,
                 opts.price_mode,
                 opts.compact,
                 None,
@@ -464,8 +463,10 @@ pub fn format_sl_day_table(days: &[SlDaySummary], opts: &SlFormatOptions) -> Str
                 d.total_lines_added,
                 d.total_lines_removed,
                 d.session_count,
-                d.peak_five_hour_pct,
-                d.peak_seven_day_pct,
+                d.min_five_hour_pct,
+                d.max_five_hour_pct,
+                d.min_seven_day_pct,
+                d.max_seven_day_pct,
                 opts.price_mode,
                 opts.compact,
                 None,
@@ -505,8 +506,10 @@ pub fn format_sl_window_table(windows: &[SlWindowSummary], opts: &SlFormatOption
                 w.total_lines_added,
                 w.total_lines_removed,
                 w.sessions,
-                Some(w.peak_five_hour_pct),
-                w.peak_seven_day_pct,
+                Some(w.min_five_hour_pct),
+                Some(w.max_five_hour_pct),
+                w.min_seven_day_pct,
+                w.max_seven_day_pct,
                 opts.price_mode,
                 opts.compact,
                 Some(est_budget_str),
@@ -697,14 +700,9 @@ pub fn format_sl_csv_sessions(sessions: &[SlSessionSummary], opts: &SlFormatOpti
     let mut output = String::new();
 
     // Header
-    output.push_str("Session,Project,Cost,Duration,API Time,API%,Lines Added,Lines Removed,Ctx%,Segments\n");
+    output.push_str("Session,Project,Cost,Duration,API Time,Lines Added,Lines Removed,Ctx%,Segments\n");
 
     for s in sessions {
-        let api_pct = if s.total_duration_ms > 0 {
-            format!("{:.1}", s.total_api_duration_ms as f64 / s.total_duration_ms as f64 * 100.0)
-        } else {
-            String::new()
-        };
         let ctx_pct = match s.max_context_pct {
             Some(p) => p.to_string(),
             None => String::new(),
@@ -715,7 +713,6 @@ pub fn format_sl_csv_sessions(sessions: &[SlSessionSummary], opts: &SlFormatOpti
             format!("{:.6}", s.total_cost),
             fmt_duration(s.total_duration_ms),
             fmt_duration(s.total_api_duration_ms),
-            api_pct,
             s.total_lines_added.to_string(),
             s.total_lines_removed.to_string(),
             ctx_pct,
@@ -777,8 +774,10 @@ mod tests {
             max_context_pct,
             first_ts: Utc.timestamp_opt(1_774_483_200, 0).single().unwrap(),
             last_ts: Utc.timestamp_opt(1_774_483_200 + 3600, 0).single().unwrap(),
-            last_five_hour_pct: Some(30),
-            last_seven_day_pct: Some(50),
+            min_five_hour_pct: Some(30),
+            max_five_hour_pct: Some(30),
+            min_seven_day_pct: Some(50),
+            max_seven_day_pct: Some(50),
         }
     }
 
@@ -901,11 +900,10 @@ mod tests {
         assert!(result.contains("Cost"), "should contain Cost header");
         assert!(result.contains("Duration"), "should contain Duration header");
         assert!(result.contains("API Time"), "should contain API Time header");
-        assert!(result.contains("API%"), "should contain API% header");
         assert!(result.contains("Lines +/-"), "should contain Lines +/- header");
         assert!(result.contains("Segs"), "should contain Segs header");
-        assert!(result.contains("Peak 5h%"), "should contain Peak 5h% header");
-        assert!(result.contains("Peak 1w%"), "should contain Peak 1w% header");
+        assert!(result.contains("5h%"), "should contain 5h% header");
+        assert!(result.contains("1w%"), "should contain 1w% header");
     }
 
     #[test]
@@ -923,25 +921,9 @@ mod tests {
         assert!(result.contains("Session"), "should contain Session header");
         assert!(result.contains("Cost"), "should contain Cost header");
         assert!(result.contains("Segs"), "should contain Segs header");
-        assert!(result.contains("Peak 5h%"), "should contain Peak 5h% header");
+        assert!(result.contains("5h%"), "should contain 5h% header");
         assert!(!result.contains("API Time"), "compact should not contain API Time");
-        assert!(!result.contains("Peak 1w%"), "compact should not contain Peak 1w%");
-    }
-
-    #[test]
-    fn test_session_table_api_pct() {
-        // duration = 3600s, api_duration = 1800s → API% = 50%
-        let sessions = vec![make_session_summary(
-            "abc123", "/home/user/foo/bar", 0.50, 3600_000, 1800_000, 100, 50, Some(75), 2
-        )];
-        let opts = SlFormatOptions {
-            tz: Some("UTC".to_string()),
-            price_mode: PriceMode::Decimal,
-            compact: false,
-            color: false,
-        };
-        let result = format_sl_session_table(&sessions, &opts);
-        assert!(result.contains("50%"), "should contain 50% API ratio");
+        assert!(!result.contains("1w%"), "compact should not contain 1w%");
     }
 
     #[test]
@@ -995,7 +977,8 @@ mod tests {
         let windows = vec![SlWindowSummary {
             window_start: Utc.timestamp_opt(1_774_483_200, 0).single().unwrap(),
             window_end: Utc.timestamp_opt(1_774_500_000, 0).single().unwrap(),
-            peak_five_hour_pct: 45,
+            min_five_hour_pct: 45,
+            max_five_hour_pct: 45,
             sessions: 3,
             total_cost: 1.23,
             est_budget: Some(2.73),
@@ -1003,7 +986,8 @@ mod tests {
             total_api_duration_ms: 2000,
             total_lines_added: 10,
             total_lines_removed: 5,
-            peak_seven_day_pct: Some(60),
+            min_seven_day_pct: Some(60),
+            max_seven_day_pct: Some(60),
         }];
         let meta = SlJsonMeta {
             source: "test".to_string(),
@@ -1017,7 +1001,8 @@ mod tests {
         let result = format_sl_json_windows(&windows, &meta);
         let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
         assert!(parsed["data"].is_array());
-        assert_eq!(parsed["data"][0]["peakFiveHourPct"], 45);
+        assert_eq!(parsed["data"][0]["minFiveHourPct"], 45);
+        assert_eq!(parsed["data"][0]["maxFiveHourPct"], 45);
     }
 
     #[test]
@@ -1058,6 +1043,6 @@ mod tests {
         let first_line = result.lines().next().unwrap();
         assert!(first_line.contains("Session"), "header should contain Session");
         assert!(first_line.contains("Cost"), "header should contain Cost");
-        assert!(first_line.contains("API%"), "header should contain API%");
+        assert!(first_line.contains("API Time"), "header should contain API Time");
     }
 }

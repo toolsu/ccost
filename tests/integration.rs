@@ -4,9 +4,9 @@ use std::path::Path;
 use serde_json;
 use tempfile::TempDir;
 
-use cctokens::formatters::json::{format_json, JsonMeta};
-use cctokens::formatters::table::{format_table, TableOptions};
-use cctokens::*;
+use ccost::formatters::json::{format_json, JsonMeta};
+use ccost::formatters::table::{format_table, TableOptions};
+use ccost::*;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1330,7 +1330,7 @@ fn make_hierarchy_data() -> (Vec<GroupedData>, GroupedData) {
 
 #[test]
 fn test_table_hierarchy_rendering() {
-    use cctokens::formatters::table::TableOptions;
+    use ccost::formatters::table::TableOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = TableOptions {
@@ -1349,7 +1349,7 @@ fn test_table_hierarchy_rendering() {
 
 #[test]
 fn test_markdown_hierarchy_rendering() {
-    use cctokens::formatters::markdown::MarkdownOptions;
+    use ccost::formatters::markdown::MarkdownOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = MarkdownOptions {
@@ -1368,7 +1368,7 @@ fn test_markdown_hierarchy_rendering() {
 
 #[test]
 fn test_html_hierarchy_rendering() {
-    use cctokens::formatters::html::HtmlOptions;
+    use ccost::formatters::html::HtmlOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = HtmlOptions {
@@ -1388,7 +1388,7 @@ fn test_html_hierarchy_rendering() {
 
 #[test]
 fn test_csv_hierarchy_rendering() {
-    use cctokens::formatters::csv::DsvOptions;
+    use ccost::formatters::csv::DsvOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = DsvOptions {
@@ -1407,7 +1407,7 @@ fn test_csv_hierarchy_rendering() {
 
 #[test]
 fn test_tsv_hierarchy_rendering() {
-    use cctokens::formatters::csv::DsvOptions;
+    use ccost::formatters::csv::DsvOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = DsvOptions {
@@ -1428,7 +1428,7 @@ fn test_tsv_hierarchy_rendering() {
 
 #[test]
 fn test_markdown_compact() {
-    use cctokens::formatters::markdown::MarkdownOptions;
+    use ccost::formatters::markdown::MarkdownOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = MarkdownOptions {
@@ -1447,7 +1447,7 @@ fn test_markdown_compact() {
 
 #[test]
 fn test_html_compact() {
-    use cctokens::formatters::html::HtmlOptions;
+    use ccost::formatters::html::HtmlOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = HtmlOptions {
@@ -1464,7 +1464,7 @@ fn test_html_compact() {
 
 #[test]
 fn test_csv_compact() {
-    use cctokens::formatters::csv::DsvOptions;
+    use ccost::formatters::csv::DsvOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = DsvOptions {
@@ -1481,7 +1481,7 @@ fn test_csv_compact() {
 
 #[test]
 fn test_csv_non_compact() {
-    use cctokens::formatters::csv::DsvOptions;
+    use ccost::formatters::csv::DsvOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = DsvOptions {
@@ -1502,7 +1502,7 @@ fn test_csv_non_compact() {
 
 #[test]
 fn test_markdown_price_decimal() {
-    use cctokens::formatters::markdown::MarkdownOptions;
+    use ccost::formatters::markdown::MarkdownOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = MarkdownOptions {
@@ -1518,7 +1518,7 @@ fn test_markdown_price_decimal() {
 
 #[test]
 fn test_markdown_price_off() {
-    use cctokens::formatters::markdown::MarkdownOptions;
+    use ccost::formatters::markdown::MarkdownOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = MarkdownOptions {
@@ -1533,7 +1533,7 @@ fn test_markdown_price_off() {
 
 #[test]
 fn test_csv_price_integer() {
-    use cctokens::formatters::csv::DsvOptions;
+    use ccost::formatters::csv::DsvOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = DsvOptions {
@@ -1548,7 +1548,7 @@ fn test_csv_price_integer() {
 
 #[test]
 fn test_html_price_decimal() {
-    use cctokens::formatters::html::HtmlOptions;
+    use ccost::formatters::html::HtmlOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = HtmlOptions {
@@ -1568,7 +1568,7 @@ fn test_html_price_decimal() {
 
 #[test]
 fn test_table_empty_data() {
-    use cctokens::formatters::table::TableOptions;
+    use ccost::formatters::table::TableOptions;
 
     let totals = GroupedData {
         label: "TOTAL".to_string(),
@@ -1590,7 +1590,7 @@ fn test_table_empty_data() {
 
 #[test]
 fn test_markdown_empty_data() {
-    use cctokens::formatters::markdown::MarkdownOptions;
+    use ccost::formatters::markdown::MarkdownOptions;
 
     let totals = GroupedData {
         label: "TOTAL".to_string(),
@@ -1611,7 +1611,7 @@ fn test_markdown_empty_data() {
 
 #[test]
 fn test_csv_empty_data() {
-    use cctokens::formatters::csv::DsvOptions;
+    use ccost::formatters::csv::DsvOptions;
 
     let totals = GroupedData {
         label: "TOTAL".to_string(),
@@ -1638,7 +1638,7 @@ fn test_csv_empty_data() {
 
 #[test]
 fn test_table_compact_hides_cache() {
-    use cctokens::formatters::table::TableOptions;
+    use ccost::formatters::table::TableOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = TableOptions {
@@ -1660,7 +1660,7 @@ fn test_table_compact_hides_cache() {
 
 #[test]
 fn test_table_with_color() {
-    use cctokens::formatters::table::TableOptions;
+    use ccost::formatters::table::TableOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = TableOptions {
@@ -1677,7 +1677,7 @@ fn test_table_with_color() {
 
 #[test]
 fn test_table_without_color() {
-    use cctokens::formatters::table::TableOptions;
+    use ccost::formatters::table::TableOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = TableOptions {
@@ -1697,7 +1697,7 @@ fn test_table_without_color() {
 
 #[test]
 fn test_json_with_children() {
-    use cctokens::formatters::json::JsonMeta;
+    use ccost::formatters::json::JsonMeta;
 
     let (data, totals) = make_hierarchy_data();
     let meta = JsonMeta {
@@ -1745,7 +1745,7 @@ fn test_json_with_children() {
 
 #[test]
 fn test_html_custom_title() {
-    use cctokens::formatters::html::HtmlOptions;
+    use ccost::formatters::html::HtmlOptions;
 
     let (data, totals) = make_hierarchy_data();
     let opts = HtmlOptions {

@@ -65,7 +65,7 @@ pub fn format_html(
     totals: &GroupedData,
     options: &HtmlOptions,
 ) -> String {
-    let title = options.title.as_deref().unwrap_or("cctokens report");
+    let title = options.title.as_deref().unwrap_or("ccost report");
     let is_default_title = options.title.is_none();
 
     let headers: Vec<&str> = if options.compact {
@@ -95,7 +95,7 @@ pub fn format_html(
 
     // h1
     if is_default_title {
-        html.push_str("<h1><a href=\"https://github.com/tomchen/cctokens\">");
+        html.push_str("<h1><a href=\"https://github.com/toolsu/ccost\">");
         html.push_str(&html_escape(title));
         html.push_str("</a></h1>\n");
     } else {
@@ -220,7 +220,7 @@ thead th {
 thead th:hover {
   background: #3a3530;
 }
-tbody {
+tbody, tfoot {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
 }
 tbody tr.parent {
@@ -409,8 +409,8 @@ mod tests {
 
         let result = format_html(&data, &totals, &options);
         assert!(result.contains("<!DOCTYPE html>"));
-        assert!(result.contains("cctokens report"));
-        assert!(result.contains("https://github.com/tomchen/cctokens"));
+        assert!(result.contains("ccost report"));
+        assert!(result.contains("https://github.com/toolsu/ccost"));
         assert!(result.contains("<thead>"));
         assert!(result.contains("<tbody>"));
         assert!(result.contains("<tfoot>"));
@@ -446,19 +446,19 @@ mod tests {
         let result = format_html(&data, &totals, &options);
         assert!(result.contains("My Custom Report"));
         // Custom title should NOT have the link
-        assert!(!result.contains("https://github.com/tomchen/cctokens"));
+        assert!(!result.contains("https://github.com/toolsu/ccost"));
     }
 
     #[test]
     fn test_html_css_tbody_font() {
         let html = CSS;
         assert!(
-            html.contains("tbody {"),
-            "CSS should have tbody rule"
+            html.contains("tbody") && html.contains("tfoot"),
+            "CSS should have tbody/tfoot rule"
         );
         assert!(
             html.contains("-apple-system") && html.contains("monospace"),
-            "tbody should use -apple-system, monospace font stack"
+            "tbody/tfoot should use -apple-system, monospace font stack"
         );
     }
 

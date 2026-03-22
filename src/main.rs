@@ -6,25 +6,25 @@ use std::process;
 use clap::{Arg, ArgAction, Command};
 use regex::Regex;
 
-use cctokens::formatters::chart::{render_chart_raw, y_label_cost, y_label_percent, ChartModeEnum, ChartOptions};
-use cctokens::formatters::csv::DsvOptions;
-use cctokens::formatters::html::HtmlOptions;
-use cctokens::formatters::json::JsonMeta;
-use cctokens::formatters::markdown::MarkdownOptions;
-use cctokens::formatters::table::TableOptions;
-use cctokens::sl::formatter::*;
-use cctokens::sl::{
+use ccost::formatters::chart::{render_chart_raw, y_label_cost, y_label_percent, ChartModeEnum, ChartOptions};
+use ccost::formatters::csv::DsvOptions;
+use ccost::formatters::html::HtmlOptions;
+use ccost::formatters::json::JsonMeta;
+use ccost::formatters::markdown::MarkdownOptions;
+use ccost::formatters::table::TableOptions;
+use ccost::sl::formatter::*;
+use ccost::sl::{
     aggregate_by_day, aggregate_by_project, aggregate_ratelimit, aggregate_sessions,
     aggregate_windows, load_sl_records, SlChartMode, SlCostDiff, SlLoadOptions, SlViewMode,
     WindowType,
 };
-use cctokens::utils::{compute_date_range, copy_to_clipboard, ext_for_format, term_width};
-use cctokens::*;
+use ccost::utils::{compute_date_range, copy_to_clipboard, ext_for_format, term_width};
+use ccost::*;
 
 const VERSION: &str = "1.0.0";
 
 fn print_help() {
-    let help = r#"Usage: cctokens [options]
+    let help = r#"Usage: ccost [options]
 
 Options:
   --per <dim>           Group by dimension: day, hour, month, session, project, model
@@ -59,7 +59,7 @@ Subcommands:
 }
 
 fn build_command() -> Command {
-    Command::new("cctokens")
+    Command::new("ccost")
         .version(VERSION)
         .disable_help_flag(true)
         .disable_version_flag(true)
@@ -185,7 +185,7 @@ fn main() {
 
     // Handle --version
     if matches.get_flag("version") {
-        println!("cctokens v{}", VERSION);
+        println!("ccost v{}", VERSION);
         process::exit(0);
     }
 
@@ -596,7 +596,7 @@ fn main() {
             let ext = output_format
                 .as_deref()
                 .unwrap_or("txt");
-            let target_filename = filename_opt.unwrap_or_else(|| format!("cctokens.{}", ext));
+            let target_filename = filename_opt.unwrap_or_else(|| format!("ccost.{}", ext));
             let file_content = format!("{}\n{}\n", chart_output, footer);
             if let Err(e) = fs::write(&target_filename, &file_content) {
                 eprintln!("Error writing to '{}': {}", target_filename, e);
@@ -652,7 +652,7 @@ fn main() {
     let ext = output_fmt
         .map(|f| ext_for_format(f))
         .unwrap_or("txt");
-    let target_filename = filename_opt.unwrap_or_else(|| format!("cctokens.{}", ext));
+    let target_filename = filename_opt.unwrap_or_else(|| format!("ccost.{}", ext));
 
     if let Err(e) = fs::write(&target_filename, &file_content) {
         eprintln!("Error writing to '{}': {}", target_filename, e);
@@ -666,13 +666,13 @@ fn main() {
 // ─── sl subcommand ────────────────────────────────────────────────────────────
 
 fn print_sl_help() {
-    let help = r#"Usage: cctokens sl [options]
+    let help = r#"Usage: ccost sl [options]
 
 Analyze Claude statusline data (rate limits, sessions, costs).
 
 Options:
   --file <path>         Path to statusline.jsonl (default: ~/.claude/statusline.jsonl)
-  --per <dim>           View dimension: session, project, day, 5h, 1w
+  --per <dim>           Group by: action, session, project, day, 5h (default), 1w
                         Default (no --per): rate-limit timeline
   --chart <mode>        Chart mode: 5h, 1w, cost
   --cost-diff           Compare SL costs with LiteLLM pricing (requires --per session)
@@ -713,6 +713,7 @@ fn run_sl(matches: &clap::ArgMatches) {
     let per_val = matches.get_one::<String>("per").cloned();
     let view_mode = if let Some(ref p) = per_val {
         match p.as_str() {
+            "action" => SlViewMode::Action,
             "session" => SlViewMode::Session,
             "project" => SlViewMode::Project,
             "day" => SlViewMode::Day,
@@ -720,14 +721,14 @@ fn run_sl(matches: &clap::ArgMatches) {
             "1w" => SlViewMode::Window1w,
             _ => {
                 errors.push(format!(
-                    "--per: invalid dimension '{}'. Valid: session, project, day, 5h, 1w",
+                    "--per: invalid dimension '{}'. Valid: action, session, project, day, 5h, 1w",
                     p
                 ));
-                SlViewMode::RateLimit
+                SlViewMode::Window5h
             }
         }
     } else {
-        SlViewMode::RateLimit
+        SlViewMode::Window5h
     };
 
     // --chart: validate
@@ -951,10 +952,10 @@ fn run_sl(matches: &clap::ArgMatches) {
     };
 
     let json_meta = SlJsonMeta {
-        source: "cctokens-sl".to_string(),
+        source: "ccost-sl".to_string(),
         file: file_path.clone(),
         view: match view_mode {
-            SlViewMode::RateLimit => "ratelimit".to_string(),
+            SlViewMode::Action => "action".to_string(),
             SlViewMode::Session => "session".to_string(),
             SlViewMode::Project => "project".to_string(),
             SlViewMode::Day => "day".to_string(),
@@ -1026,7 +1027,7 @@ fn run_sl(matches: &clap::ArgMatches) {
         if output_format.is_some() || filename_opt.is_some() {
             let ext = output_format.as_deref().unwrap_or("txt");
             let target_filename =
-                filename_opt.unwrap_or_else(|| format!("cctokens-sl.{}", ext));
+                filename_opt.unwrap_or_else(|| format!("ccost-sl.{}", ext));
             let file_content = format!("{}\n", chart_output);
             if let Err(e) = fs::write(&target_filename, &file_content) {
                 eprintln!("Error writing to '{}': {}", target_filename, e);
@@ -1044,7 +1045,7 @@ fn run_sl(matches: &clap::ArgMatches) {
     // Helper to generate content for a given format string
     let generate_sl_content = |fmt: &str,
                                view: &SlViewMode,
-                               recs: &[cctokens::sl::SlRecord],
+                               recs: &[ccost::sl::SlRecord],
                                color: bool|
      -> String {
         let opts = SlFormatOptions {
@@ -1056,7 +1057,7 @@ fn run_sl(matches: &clap::ArgMatches) {
 
         match fmt {
             "json" => match view {
-                SlViewMode::RateLimit => {
+                SlViewMode::Action => {
                     let entries = aggregate_ratelimit(recs);
                     format_sl_json_ratelimit(&entries, &json_meta)
                 }
@@ -1086,7 +1087,7 @@ fn run_sl(matches: &clap::ArgMatches) {
                 }
             },
             "csv" => match view {
-                SlViewMode::RateLimit => {
+                SlViewMode::Action => {
                     let entries = aggregate_ratelimit(recs);
                     format_sl_csv_ratelimit(&entries, tz_opt.as_deref())
                 }
@@ -1132,7 +1133,7 @@ fn run_sl(matches: &clap::ArgMatches) {
     };
 
     let ext = output_fmt.map(|f| ext_for_format(f)).unwrap_or("txt");
-    let target_filename = filename_opt.unwrap_or_else(|| format!("cctokens-sl.{}", ext));
+    let target_filename = filename_opt.unwrap_or_else(|| format!("ccost-sl.{}", ext));
 
     if let Err(e) = fs::write(&target_filename, &file_content) {
         eprintln!("Error writing to '{}': {}", target_filename, e);
@@ -1143,13 +1144,13 @@ fn run_sl(matches: &clap::ArgMatches) {
 
 fn generate_sl_table_content(
     view_mode: &SlViewMode,
-    records: &[cctokens::sl::SlRecord],
+    records: &[ccost::sl::SlRecord],
     opts: &SlFormatOptions,
     cost_diff: bool,
     matches: &clap::ArgMatches,
 ) -> String {
     match view_mode {
-        SlViewMode::RateLimit => {
+        SlViewMode::Action => {
             let entries = aggregate_ratelimit(records);
             format_sl_ratelimit_table(&entries, opts)
         }
@@ -1186,7 +1187,7 @@ fn generate_sl_table_content(
 }
 
 fn compute_cost_diffs(
-    sessions: &[cctokens::sl::SlSessionSummary],
+    sessions: &[ccost::sl::SlSessionSummary],
     matches: &clap::ArgMatches,
 ) -> Vec<SlCostDiff> {
     // Load conversation JSONL via the existing pipeline
