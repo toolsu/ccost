@@ -1,12 +1,12 @@
-use std::collections::{HashMap, HashSet, BTreeSet};
-use std::fs;
-use std::path::{Path, PathBuf};
-use chrono::{DateTime, Local, Utc, TimeZone, NaiveDateTime};
+use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
 use rayon::prelude::*;
 use serde::Deserialize;
 use serde_json::Value;
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::fs;
+use std::path::{Path, PathBuf};
 
-use crate::types::{TokenRecord, DedupStats, LoadOptions, RecordsMeta, LoadResult};
+use crate::types::{DedupStats, LoadOptions, LoadResult, RecordsMeta, TokenRecord};
 
 /// Try to parse a single JSON value as a DateTime<Utc>.
 /// - String: parse as ISO 8601
@@ -107,7 +107,10 @@ fn dedup_kept_indices(records: &[Value]) -> (Vec<usize>, DedupStats) {
     let mut keyed_indices: HashSet<usize> = HashSet::new();
 
     for (i, rec) in records.iter().enumerate() {
-        let message_id = rec.get("message").and_then(|m| m.get("id")).and_then(|v| v.as_str());
+        let message_id = rec
+            .get("message")
+            .and_then(|m| m.get("id"))
+            .and_then(|v| v.as_str());
         let request_id = rec.get("requestId").and_then(|v| v.as_str());
 
         if let (Some(mid), Some(rid)) = (message_id, request_id) {
@@ -117,7 +120,9 @@ fn dedup_kept_indices(records: &[Value]) -> (Vec<usize>, DedupStats) {
 
             match best.get(&key) {
                 Some(&(_, existing_tokens)) if tokens < existing_tokens => {}
-                _ => { best.insert(key, (i, tokens)); }
+                _ => {
+                    best.insert(key, (i, tokens));
+                }
             }
         }
     }
@@ -145,7 +150,10 @@ fn dedup_kept_indices(records: &[Value]) -> (Vec<usize>, DedupStats) {
 /// Records without both `message.id` and `requestId` pass through unmodified.
 pub fn deduplicate_streaming(records: &[Value]) -> (Vec<Value>, DedupStats) {
     let (kept_indices, stats) = dedup_kept_indices(records);
-    let result = kept_indices.into_iter().map(|i| records[i].clone()).collect();
+    let result = kept_indices
+        .into_iter()
+        .map(|i| records[i].clone())
+        .collect();
     (result, stats)
 }
 
@@ -185,9 +193,7 @@ pub fn format_date_in_tz(date: &DateTime<Utc>, tz: Option<&str>) -> String {
             let local_dt = date.with_timezone(&Local);
             local_dt.format(format_str).to_string()
         }
-        Some("UTC") => {
-            date.format(format_str).to_string()
-        }
+        Some("UTC") => date.format(format_str).to_string(),
         Some(tz_str) => {
             // Try fixed offset: +HH:MM or -HH:MM
             if (tz_str.starts_with('+') || tz_str.starts_with('-')) && tz_str.len() == 6 {
@@ -382,7 +388,8 @@ fn extract_timestamp_raw(rec: &RawRecord) -> Option<DateTime<Utc>> {
 }
 
 fn get_output_tokens_raw(rec: &RawRecord) -> u64 {
-    rec.message.as_ref()
+    rec.message
+        .as_ref()
         .and_then(|m| m.usage.as_ref())
         .and_then(|u| u.output_tokens)
         .unwrap_or(0)
@@ -404,7 +411,9 @@ fn dedup_kept_indices_raw(records: &[RawRecord]) -> (Vec<usize>, DedupStats) {
 
             match best.get(&key) {
                 Some(&(_, existing_tokens)) if tokens < existing_tokens => {}
-                _ => { best.insert(key, (i, tokens)); }
+                _ => {
+                    best.insert(key, (i, tokens));
+                }
             }
         }
     }
@@ -491,7 +500,8 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
         session_id: String,
     }
 
-    let parsed_files: Vec<ParsedFile> = all_files.par_iter()
+    let parsed_files: Vec<ParsedFile> = all_files
+        .par_iter()
         .filter_map(|file_path| {
             let content = fs::read_to_string(file_path).ok()?;
             let file_mtime = fs::metadata(file_path)
@@ -502,7 +512,9 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
             let mut records = Vec::new();
             for line in content.lines() {
                 let line = line.trim();
-                if line.is_empty() { continue; }
+                if line.is_empty() {
+                    continue;
+                }
 
                 let rec: RawRecord = match serde_json::from_str(line) {
                     Ok(r) => r,
@@ -518,11 +530,15 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
                 }
 
                 // Must have usage with input_tokens and output_tokens
-                let has_usage = rec.message.as_ref()
+                let has_usage = rec
+                    .message
+                    .as_ref()
                     .and_then(|m| m.usage.as_ref())
                     .map(|u| u.input_tokens.is_some() && u.output_tokens.is_some())
                     .unwrap_or(false);
-                if !has_usage { continue; }
+                if !has_usage {
+                    continue;
+                }
 
                 // Must have model != "<synthetic>"
                 match rec.message.as_ref().and_then(|m| m.model.as_deref()) {
@@ -533,16 +549,24 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
                 records.push(rec);
             }
 
-            if records.is_empty() { return None; }
+            if records.is_empty() {
+                return None;
+            }
 
             let file_path_str = file_path.to_string_lossy();
             let project = extract_project_name(&file_path_str);
-            let session_id = file_path.file_stem()
+            let session_id = file_path
+                .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("")
                 .to_string();
 
-            Some(ParsedFile { file_mtime, records, project, session_id })
+            Some(ParsedFile {
+                file_mtime,
+                records,
+                project,
+                session_id,
+            })
         })
         .collect();
 
@@ -577,33 +601,44 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
     let mut timestamped: Vec<TimestampedRef> = Vec::with_capacity(kept_indices.len());
 
     for (fi_idx, fi) in file_infos.iter().enumerate() {
-        let file_kept: Vec<usize> = fi.record_range.clone()
+        let file_kept: Vec<usize> = fi
+            .record_range
+            .clone()
             .filter(|i| kept_set.contains(i))
             .collect();
 
-        if file_kept.is_empty() { continue; }
+        if file_kept.is_empty() {
+            continue;
+        }
 
-        let first_ts_pos = file_kept.iter()
+        let first_ts_pos = file_kept
+            .iter()
             .position(|&i| extract_timestamp_raw(&all_records[i]).is_some());
 
         match first_ts_pos {
             None => {
                 for &idx in &file_kept {
                     timestamped.push(TimestampedRef {
-                        record_idx: idx, timestamp: fi.file_mtime, file_info_idx: fi_idx,
+                        record_idx: idx,
+                        timestamp: fi.file_mtime,
+                        file_info_idx: fi_idx,
                     });
                 }
             }
             Some(first_pos) => {
                 for &idx in &file_kept[..first_pos] {
                     timestamped.push(TimestampedRef {
-                        record_idx: idx, timestamp: fi.file_mtime, file_info_idx: fi_idx,
+                        record_idx: idx,
+                        timestamp: fi.file_mtime,
+                        file_info_idx: fi_idx,
                     });
                 }
                 for &idx in &file_kept[first_pos..] {
                     if let Some(ts) = extract_timestamp_raw(&all_records[idx]) {
                         timestamped.push(TimestampedRef {
-                            record_idx: idx, timestamp: ts, file_info_idx: fi_idx,
+                            record_idx: idx,
+                            timestamp: ts,
+                            file_info_idx: fi_idx,
                         });
                     }
                 }
@@ -621,8 +656,14 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
 
     let from_normalized = options.from.as_ref().map(|s| s.replace(' ', "T"));
     let to_normalized = options.to.as_ref().map(|s| s.replace(' ', "T"));
-    let from_is_date_only = from_normalized.as_ref().map(|s| s.len() == 10).unwrap_or(false);
-    let to_is_date_only = to_normalized.as_ref().map(|s| s.len() == 10).unwrap_or(false);
+    let from_is_date_only = from_normalized
+        .as_ref()
+        .map(|s| s.len() == 10)
+        .unwrap_or(false);
+    let to_is_date_only = to_normalized
+        .as_ref()
+        .map(|s| s.len() == 10)
+        .unwrap_or(false);
 
     // Pre-lowercase filter strings once
     let proj_filter_lower = options.project.as_ref().map(|s| s.to_lowercase());
@@ -642,13 +683,16 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
         let rec = &all_records[tr.record_idx];
         let fi = &file_infos[tr.file_info_idx];
 
-        let model = rec.message.as_ref()
+        let model = rec
+            .message
+            .as_ref()
             .and_then(|m| m.model.as_deref())
             .unwrap_or("");
 
         // from/to filter (only format date if needed)
         if needs_date_filter {
-            let formatted = format_date_in_resolved_tz(&tr.timestamp, resolved_tz.as_ref().unwrap());
+            let formatted =
+                format_date_in_resolved_tz(&tr.timestamp, resolved_tz.as_ref().unwrap());
 
             if let Some(ref from_val) = from_normalized {
                 let cmp_value = if from_is_date_only {
@@ -698,7 +742,9 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
         let usage = rec.message.as_ref().and_then(|m| m.usage.as_ref());
         let input_tokens = usage.and_then(|u| u.input_tokens).unwrap_or(0);
         let output_tokens = usage.and_then(|u| u.output_tokens).unwrap_or(0);
-        let cache_creation_tokens = usage.and_then(|u| u.cache_creation_input_tokens).unwrap_or(0);
+        let cache_creation_tokens = usage
+            .and_then(|u| u.cache_creation_input_tokens)
+            .unwrap_or(0);
         let cache_read_tokens = usage.and_then(|u| u.cache_read_input_tokens).unwrap_or(0);
 
         // Update meta in same pass

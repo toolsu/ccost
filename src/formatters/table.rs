@@ -48,7 +48,12 @@ struct RowData {
     cells: Vec<String>,
 }
 
-fn build_row(entry: &GroupedData, price_mode: PriceMode, compact: bool, label_prefix: &str) -> RowData {
+fn build_row(
+    entry: &GroupedData,
+    price_mode: PriceMode,
+    compact: bool,
+    label_prefix: &str,
+) -> RowData {
     let in_total = entry.input_tokens + entry.cache_creation_tokens + entry.cache_read_tokens;
     let in_total_cost = entry.input_cost + entry.cache_creation_cost + entry.cache_read_cost;
     let total = in_total + entry.output_tokens;
@@ -65,7 +70,11 @@ fn build_row(entry: &GroupedData, price_mode: PriceMode, compact: bool, label_pr
     } else {
         vec![
             format_cell(entry.input_tokens, entry.input_cost, price_mode),
-            format_cell(entry.cache_creation_tokens, entry.cache_creation_cost, price_mode),
+            format_cell(
+                entry.cache_creation_tokens,
+                entry.cache_creation_cost,
+                price_mode,
+            ),
             format_cell(entry.cache_read_tokens, entry.cache_read_cost, price_mode),
             format_cell(in_total, in_total_cost, price_mode),
             format_cell(entry.output_tokens, entry.output_cost, price_mode),
@@ -118,7 +127,12 @@ pub fn format_table(data: &[GroupedData], totals: &GroupedData, options: &TableO
     totals_rows[0].label = "TOTAL".to_string();
     if let Some(ref children) = totals.children {
         for child in children {
-            totals_rows.push(build_row(child, options.price_mode, options.compact, "\u{2514}\u{2500} "));
+            totals_rows.push(build_row(
+                child,
+                options.price_mode,
+                options.compact,
+                "\u{2514}\u{2500} ",
+            ));
         }
     }
 
@@ -277,11 +291,7 @@ fn display_width(s: &str) -> usize {
 /// Format grouped data as a plain-text table (no ANSI colors).
 /// This is the "txt" format equivalent, a convenience wrapper around `format_table`
 /// with colors forced off.
-pub fn format_txt(
-    data: &[GroupedData],
-    totals: &GroupedData,
-    opts: &TableOptions,
-) -> String {
+pub fn format_txt(data: &[GroupedData], totals: &GroupedData, opts: &TableOptions) -> String {
     let txt_opts = TableOptions {
         dimension_label: opts.dimension_label.clone(),
         price_mode: opts.price_mode,

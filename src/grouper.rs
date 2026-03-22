@@ -72,10 +72,22 @@ fn get_group_key_resolved(
 
 fn format_timestamp_resolved(record: &PricedTokenRecord, fmt: &str, tz: &ResolvedTz) -> String {
     match tz {
-        ResolvedTz::Local => record.timestamp.with_timezone(&chrono::Local).format(fmt).to_string(),
+        ResolvedTz::Local => record
+            .timestamp
+            .with_timezone(&chrono::Local)
+            .format(fmt)
+            .to_string(),
         ResolvedTz::Utc => record.timestamp.format(fmt).to_string(),
-        ResolvedTz::Fixed(offset) => record.timestamp.with_timezone(offset).format(fmt).to_string(),
-        ResolvedTz::Iana(iana_tz) => record.timestamp.with_timezone(iana_tz).format(fmt).to_string(),
+        ResolvedTz::Fixed(offset) => record
+            .timestamp
+            .with_timezone(offset)
+            .format(fmt)
+            .to_string(),
+        ResolvedTz::Iana(iana_tz) => record
+            .timestamp
+            .with_timezone(iana_tz)
+            .format(fmt)
+            .to_string(),
     }
 }
 
@@ -218,8 +230,10 @@ pub fn group_records(
                     sort_grouped_data(&mut children, opts.order);
 
                     // Parent = sum of all children's records
-                    let all_child_recs: Vec<&PricedTokenRecord> =
-                        child_buckets.values().flat_map(|v| v.iter().copied()).collect();
+                    let all_child_recs: Vec<&PricedTokenRecord> = child_buckets
+                        .values()
+                        .flat_map(|v| v.iter().copied())
+                        .collect();
                     let mut parent = aggregate(parent_key, &all_child_recs);
                     parent.children = Some(children);
                     parent

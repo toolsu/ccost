@@ -2,8 +2,6 @@
 
 Analyze Claude Code token usage and cost from your local conversation history.
 
-Rust port of [ccost](https://github.com/toolsu/ccost) (TypeScript).
-
 Reads JSONL files from `~/.claude/projects/` and `~/.config/claude/projects/`, deduplicates streaming entries, calculates costs using LiteLLM pricing, groups by configurable dimensions, and outputs as table, JSON, Markdown, HTML, CSV, TSV, or braille chart.
 
 Also includes `ccost sl` — a subcommand that analyzes `~/.claude/statusline.jsonl` for **rate limit tracking**, session summaries, 5-hour budget estimation, and cost cross-comparison.
@@ -194,7 +192,7 @@ If you are already using a `~/.claude/statusline.sh`, just add `echo "{\"ts\":$(
 | `ccost sl --chart 1w` | 1-week rate limit percentage chart |
 | `ccost sl --chart cost` | Cumulative cost chart |
 
-All `--per` views share the same columns: `Cost`, `Duration`, `API Time`, `Lines +/-`, `Sess`, `5h%`, `1w%`. Only the first column (the grouping label) changes. `--per 1h` / `--per 5h` add `Est 5h Budg`; `--per 1w` adds `Est 1w Budg`; `--per 1h` also adds `5h Resets`. The `5h%` and `1w%` columns show min–max ranges (e.g. `1–29%`).
+`--per session/project/day/1h/5h/1w` views share unified columns: `Cost`, `Duration`, `API Time`, `Lines +/-`, `Sess`, `5h%`, `1w%`. `--per 1h`/`--per 5h` add `Est 5h Budg`; `--per 1w` adds `Est 1w Budg`; `--per 1h` also adds `5h Resets`. `--per action` uses its own column layout: `Time`, `Cost`, `5h%`, `1w%`, `5h Resets`, `Session`. The `5h%` and `1w%` columns in unified views show min–max ranges (e.g. `1–29%`).
 
 ### Statusline-Specific Flags
 
@@ -219,6 +217,8 @@ Session ef2fa622: 3 segments
 ```
 
 Rate limits are account-level and do NOT reset with sessions.
+
+**Note on `--per day`:** Sessions that span midnight are assigned entirely to the day of `first_ts` (when the session started). Cost/duration are not split across days.
 
 ### Budget Estimation
 

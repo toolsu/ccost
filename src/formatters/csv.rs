@@ -1,5 +1,5 @@
+use super::table::{format_cost, format_tokens};
 use crate::types::{GroupedData, PriceMode};
-use super::table::{format_tokens, format_cost};
 
 pub struct DsvOptions {
     pub dimension_label: String,
@@ -22,7 +22,12 @@ struct RowData {
     cells: Vec<String>,
 }
 
-fn build_row(entry: &GroupedData, price_mode: PriceMode, compact: bool, label_prefix: &str) -> RowData {
+fn build_row(
+    entry: &GroupedData,
+    price_mode: PriceMode,
+    compact: bool,
+    label_prefix: &str,
+) -> RowData {
     let in_total = entry.input_tokens + entry.cache_creation_tokens + entry.cache_read_tokens;
     let in_total_cost = entry.input_cost + entry.cache_creation_cost + entry.cache_read_cost;
     let total = in_total + entry.output_tokens;
@@ -39,7 +44,11 @@ fn build_row(entry: &GroupedData, price_mode: PriceMode, compact: bool, label_pr
     } else {
         vec![
             format_cell(entry.input_tokens, entry.input_cost, price_mode),
-            format_cell(entry.cache_creation_tokens, entry.cache_creation_cost, price_mode),
+            format_cell(
+                entry.cache_creation_tokens,
+                entry.cache_creation_cost,
+                price_mode,
+            ),
             format_cell(entry.cache_read_tokens, entry.cache_read_cost, price_mode),
             format_cell(in_total, in_total_cost, price_mode),
             format_cell(entry.output_tokens, entry.output_cost, price_mode),
@@ -50,7 +59,12 @@ fn build_row(entry: &GroupedData, price_mode: PriceMode, compact: bool, label_pr
     RowData { label, cells }
 }
 
-fn collect_all_rows(data: &[GroupedData], totals: &GroupedData, price_mode: PriceMode, compact: bool) -> (Vec<String>, Vec<RowData>) {
+fn collect_all_rows(
+    data: &[GroupedData],
+    totals: &GroupedData,
+    price_mode: PriceMode,
+    compact: bool,
+) -> (Vec<String>, Vec<RowData>) {
     let headers: Vec<String> = if compact {
         vec![
             "In Total".to_string(),
@@ -117,11 +131,7 @@ fn tsv_escape(field: &str) -> String {
 }
 
 /// Format data as CSV with comma delimiter and RFC 4180 escaping.
-pub fn format_csv(
-    data: &[GroupedData],
-    totals: &GroupedData,
-    options: &DsvOptions,
-) -> String {
+pub fn format_csv(data: &[GroupedData], totals: &GroupedData, options: &DsvOptions) -> String {
     let (headers, rows) = collect_all_rows(data, totals, options.price_mode, options.compact);
 
     let mut output = String::new();
@@ -148,11 +158,7 @@ pub fn format_csv(
 }
 
 /// Format data as TSV with tab delimiter and backslash escaping.
-pub fn format_tsv(
-    data: &[GroupedData],
-    totals: &GroupedData,
-    options: &DsvOptions,
-) -> String {
+pub fn format_tsv(data: &[GroupedData], totals: &GroupedData, options: &DsvOptions) -> String {
     let (headers, rows) = collect_all_rows(data, totals, options.price_mode, options.compact);
 
     let mut output = String::new();

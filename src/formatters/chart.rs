@@ -1,6 +1,6 @@
-use std::collections::BTreeMap;
-use chrono::{DateTime, Utc, Local};
 use crate::types::{GroupedData, PriceMode, PricedTokenRecord};
+use chrono::{DateTime, Local, Utc};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChartModeEnum {
@@ -19,12 +19,7 @@ pub struct ChartOptions {
 
 /// Braille dot map: each character is 2 columns x 4 rows.
 /// Index by [row][col] to get the bit to set.
-const BRAILLE_DOT_MAP: [[u8; 2]; 4] = [
-    [0x01, 0x08],
-    [0x02, 0x10],
-    [0x04, 0x20],
-    [0x40, 0x80],
-];
+const BRAILLE_DOT_MAP: [[u8; 2]; 4] = [[0x01, 0x08], [0x02, 0x10], [0x04, 0x20], [0x40, 0x80]];
 
 /// Base Unicode codepoint for braille patterns.
 const BRAILLE_BASE: u32 = 0x2800;
@@ -421,11 +416,7 @@ fn render_chart_core(
 
 /// Render a braille line chart from grouped data (used by main.rs).
 /// Each GroupedData entry represents one data point on the chart, keyed by its label.
-pub fn render_chart(
-    data: &[GroupedData],
-    _totals: &GroupedData,
-    options: &ChartOptions,
-) -> String {
+pub fn render_chart(data: &[GroupedData], _totals: &GroupedData, options: &ChartOptions) -> String {
     if data.is_empty() {
         return "No data to chart.".to_string();
     }
@@ -439,10 +430,8 @@ pub fn render_chart(
         .map(|d| match options.mode {
             ChartModeEnum::Cost => d.total_cost,
             ChartModeEnum::Token => {
-                (d.input_tokens
-                    + d.output_tokens
-                    + d.cache_creation_tokens
-                    + d.cache_read_tokens) as f64
+                (d.input_tokens + d.output_tokens + d.cache_creation_tokens + d.cache_read_tokens)
+                    as f64
             }
         })
         .collect();
@@ -452,10 +441,7 @@ pub fn render_chart(
 
 /// Render a braille line chart from priced token records (alternative entry point).
 /// Aggregates records into time buckets before rendering.
-pub fn render_chart_from_records(
-    records: &[PricedTokenRecord],
-    options: &ChartOptions,
-) -> String {
+pub fn render_chart_from_records(records: &[PricedTokenRecord], options: &ChartOptions) -> String {
     if records.is_empty() {
         return "No data to chart.".to_string();
     }
@@ -845,21 +831,9 @@ mod tests {
     #[test]
     fn test_render_chart_from_records_multiple() {
         let records = vec![
-            make_record(
-                Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
-                1.0,
-                100,
-            ),
-            make_record(
-                Utc.with_ymd_and_hms(2025, 1, 2, 0, 0, 0).unwrap(),
-                3.0,
-                300,
-            ),
-            make_record(
-                Utc.with_ymd_and_hms(2025, 1, 3, 0, 0, 0).unwrap(),
-                2.0,
-                200,
-            ),
+            make_record(Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(), 1.0, 100),
+            make_record(Utc.with_ymd_and_hms(2025, 1, 2, 0, 0, 0).unwrap(), 3.0, 300),
+            make_record(Utc.with_ymd_and_hms(2025, 1, 3, 0, 0, 0).unwrap(), 2.0, 200),
         ];
         let options = ChartOptions {
             mode: ChartModeEnum::Cost,
@@ -877,46 +851,22 @@ mod tests {
     fn test_auto_granularity() {
         // Within 2 days -> Hour
         let records = vec![
-            make_record(
-                Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
-                1.0,
-                100,
-            ),
-            make_record(
-                Utc.with_ymd_and_hms(2025, 1, 2, 0, 0, 0).unwrap(),
-                1.0,
-                100,
-            ),
+            make_record(Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(), 1.0, 100),
+            make_record(Utc.with_ymd_and_hms(2025, 1, 2, 0, 0, 0).unwrap(), 1.0, 100),
         ];
         assert_eq!(auto_granularity(&records), Granularity::Hour);
 
         // Within 90 days -> Day
         let records = vec![
-            make_record(
-                Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
-                1.0,
-                100,
-            ),
-            make_record(
-                Utc.with_ymd_and_hms(2025, 3, 1, 0, 0, 0).unwrap(),
-                1.0,
-                100,
-            ),
+            make_record(Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(), 1.0, 100),
+            make_record(Utc.with_ymd_and_hms(2025, 3, 1, 0, 0, 0).unwrap(), 1.0, 100),
         ];
         assert_eq!(auto_granularity(&records), Granularity::Day);
 
         // Over 90 days -> Month
         let records = vec![
-            make_record(
-                Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
-                1.0,
-                100,
-            ),
-            make_record(
-                Utc.with_ymd_and_hms(2025, 7, 1, 0, 0, 0).unwrap(),
-                1.0,
-                100,
-            ),
+            make_record(Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(), 1.0, 100),
+            make_record(Utc.with_ymd_and_hms(2025, 7, 1, 0, 0, 0).unwrap(), 1.0, 100),
         ];
         assert_eq!(auto_granularity(&records), Granularity::Month);
     }
@@ -959,14 +909,8 @@ mod tests {
             bucket_key(&ts, Granularity::Hour, Some("UTC")),
             "2025-03-15T10"
         );
-        assert_eq!(
-            bucket_key(&ts, Granularity::Day, Some("UTC")),
-            "2025-03-15"
-        );
-        assert_eq!(
-            bucket_key(&ts, Granularity::Month, Some("UTC")),
-            "2025-03"
-        );
+        assert_eq!(bucket_key(&ts, Granularity::Day, Some("UTC")), "2025-03-15");
+        assert_eq!(bucket_key(&ts, Granularity::Month, Some("UTC")), "2025-03");
     }
 
     #[test]

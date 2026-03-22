@@ -6,9 +6,11 @@ use regex::Regex;
 
 use crate::types::{ModelPricing, PricedTokenRecord, PricingData, TokenRecord};
 
-static DATE_SUFFIX_PRICING_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[-@]\d{8}$").unwrap());
+static DATE_SUFFIX_PRICING_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[-@]\d{8}$").unwrap());
 static PREFIX_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^anthropic[/.]").unwrap());
-static VERSION_SUFFIX_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"-v\d+(?::\d+)?$").unwrap());
+static VERSION_SUFFIX_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"-v\d+(?::\d+)?$").unwrap());
 static VALID_NAME_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^claude-\w+-\d").unwrap());
 
 /// Load bundled pricing data embedded at compile time.
@@ -50,7 +52,10 @@ pub fn fetch_live_pricing() -> Result<PricingData, Box<dyn std::error::Error>> {
         }
 
         // Must have a numeric input_cost_per_token
-        let input_cost = match value.get("input_cost_per_token").and_then(serde_json::Value::as_f64) {
+        let input_cost = match value
+            .get("input_cost_per_token")
+            .and_then(serde_json::Value::as_f64)
+        {
             Some(c) => c,
             None => continue,
         };
@@ -168,8 +173,7 @@ pub fn calculate_cost(
                     * model_pricing.cache_creation_cost_per_token;
                 let cache_read_cost =
                     record.cache_read_tokens as f64 * model_pricing.cache_read_cost_per_token;
-                let output_cost =
-                    record.output_tokens as f64 * model_pricing.output_cost_per_token;
+                let output_cost = record.output_tokens as f64 * model_pricing.output_cost_per_token;
 
                 results.push(PricedTokenRecord::from_token_record(
                     record,
@@ -286,7 +290,10 @@ mod tests {
     #[test]
     fn test_load_bundled_pricing() {
         let pricing = load_pricing();
-        assert!(!pricing.models.is_empty(), "bundled pricing should have models");
+        assert!(
+            !pricing.models.is_empty(),
+            "bundled pricing should have models"
+        );
         assert!(!pricing.fetched_at.is_empty());
     }
 
@@ -348,7 +355,10 @@ mod tests {
 
         let priced = calculate_cost(&records, Some(&pricing));
         assert_eq!(priced.len(), 1);
-        assert!(priced[0].input_cost > 0.0, "known model should have non-zero input cost");
+        assert!(
+            priced[0].input_cost > 0.0,
+            "known model should have non-zero input cost"
+        );
         assert!(priced[0].output_cost > 0.0);
         assert!(priced[0].total_cost > 0.0);
     }

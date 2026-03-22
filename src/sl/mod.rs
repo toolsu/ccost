@@ -1,10 +1,10 @@
-pub mod types;
-pub mod parser;
 pub mod aggregator;
 pub mod formatter;
+pub mod parser;
+pub mod types;
 
-pub use types::*;
-#[allow(unused_imports)]
-pub use parser::*;
 #[allow(unused_imports)]
 pub use aggregator::*;
+#[allow(unused_imports)]
+pub use parser::*;
+pub use types::*;

@@ -66,27 +66,103 @@ fn create_test_file() -> NamedTempFile {
 
     let lines: Vec<String> = vec![
         // Session 1 – record 1 (cost=0, start of segment)
-        make_sl_line(t + 100, sess1, 0.0, 5000, 2000, 0, 0,
-                     Some(2), Some(63), Some(1774497600), Some(1774605600)),
+        make_sl_line(
+            t + 100,
+            sess1,
+            0.0,
+            5000,
+            2000,
+            0,
+            0,
+            Some(2),
+            Some(63),
+            Some(1774497600),
+            Some(1774605600),
+        ),
         // Session 1 – record 2 (cost=0.5)
-        make_sl_line(t + 200, sess1, 0.5, 15000, 6000, 5, 2,
-                     Some(3), Some(63), Some(1774497600), Some(1774605600)),
+        make_sl_line(
+            t + 200,
+            sess1,
+            0.5,
+            15000,
+            6000,
+            5,
+            2,
+            Some(3),
+            Some(63),
+            Some(1774497600),
+            Some(1774605600),
+        ),
         // Session 1 – record 3 (cost=1.0, final)
-        make_sl_line(t + 300, sess1, 1.0, 30000, 12000, 10, 5,
-                     Some(4), Some(63), Some(1774497600), Some(1774605600)),
-
+        make_sl_line(
+            t + 300,
+            sess1,
+            1.0,
+            30000,
+            12000,
+            10,
+            5,
+            Some(4),
+            Some(63),
+            Some(1774497600),
+            Some(1774605600),
+        ),
         // Session 2 – record 1 (cost=0, start of first segment)
-        make_sl_line(t + 400, sess2, 0.0, 3000, 1200, 0, 0,
-                     Some(4), Some(63), Some(1774497600), Some(1774605600)),
+        make_sl_line(
+            t + 400,
+            sess2,
+            0.0,
+            3000,
+            1200,
+            0,
+            0,
+            Some(4),
+            Some(63),
+            Some(1774497600),
+            Some(1774605600),
+        ),
         // Session 2 – record 2 (cost=2.0, end of first segment)
-        make_sl_line(t + 500, sess2, 2.0, 40000, 16000, 20, 8,
-                     Some(5), Some(64), Some(1774497600), Some(1774605600)),
+        make_sl_line(
+            t + 500,
+            sess2,
+            2.0,
+            40000,
+            16000,
+            20,
+            8,
+            Some(5),
+            Some(64),
+            Some(1774497600),
+            Some(1774605600),
+        ),
         // Session 2 – reset: cost drops to 0, short duration → new segment
-        make_sl_line(t + 600, sess2, 0.0, 1000, 400, 0, 0,
-                     Some(1), Some(64), Some(1774515600), Some(1774605600)),
+        make_sl_line(
+            t + 600,
+            sess2,
+            0.0,
+            1000,
+            400,
+            0,
+            0,
+            Some(1),
+            Some(64),
+            Some(1774515600),
+            Some(1774605600),
+        ),
         // Session 2 – record 4 (cost=0.5, end of second segment)
-        make_sl_line(t + 700, sess2, 0.5, 8000, 3200, 5, 2,
-                     Some(2), Some(64), Some(1774515600), Some(1774605600)),
+        make_sl_line(
+            t + 700,
+            sess2,
+            0.5,
+            8000,
+            3200,
+            5,
+            2,
+            Some(2),
+            Some(64),
+            Some(1774515600),
+            Some(1774605600),
+        ),
     ];
 
     let mut f = NamedTempFile::new().expect("create temp file");
@@ -146,7 +222,9 @@ fn test_sl_per_session() {
     let path = f.path().to_str().unwrap();
 
     sl_cmd()
-        .args(["sl", "--file", path, "--per", "session", "--cost", "decimal"])
+        .args([
+            "sl", "--file", path, "--per", "session", "--cost", "decimal",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("sess-aaa"))
@@ -191,10 +269,15 @@ fn test_sl_json_output() {
 
     let output = sl_cmd()
         .args([
-            "sl", "--file", path,
-            "--per", "session",
-            "--output", "json",
-            "--filename", "/dev/stdout",
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "session",
+            "--output",
+            "json",
+            "--filename",
+            "/dev/stdout",
         ])
         .output()
         .expect("run command");
@@ -266,10 +349,15 @@ fn test_sl_session_filter() {
 
     sl_cmd()
         .args([
-            "sl", "--file", path,
-            "--per", "session",
-            "--session", "aaaa",
-            "--cost", "decimal",
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "session",
+            "--session",
+            "aaaa",
+            "--cost",
+            "decimal",
         ])
         .assert()
         .success()
@@ -407,20 +495,42 @@ fn test_sl_output_html() {
     let path = f.path().to_str().unwrap();
 
     let output = sl_cmd()
-        .args(["sl", "--file", path, "--per", "5h", "--output", "html", "--filename", "/dev/stdout"])
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "5h",
+            "--output",
+            "html",
+            "--filename",
+            "/dev/stdout",
+        ])
         .output()
         .expect("run command");
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("<!DOCTYPE html>"), "should be full HTML page");
+    assert!(
+        stdout.contains("<!DOCTYPE html>"),
+        "should be full HTML page"
+    );
     assert!(stdout.contains("ccost report"), "should have title");
     assert!(stdout.contains("<style>"), "should have embedded CSS");
     assert!(stdout.contains("<script>"), "should have embedded JS");
-    assert!(stdout.contains("background: #1a1816"), "should have dark theme CSS");
-    assert!(stdout.contains("class=\"sortable\""), "should have sortable columns");
+    assert!(
+        stdout.contains("background: #1a1816"),
+        "should have dark theme CSS"
+    );
+    assert!(
+        stdout.contains("class=\"sortable\""),
+        "should have sortable columns"
+    );
     assert!(stdout.contains("<thead>"), "should contain <thead>");
     assert!(stdout.contains("<tfoot>"), "should contain <tfoot>");
-    assert!(stdout.contains("class=\"totals totals-main\""), "should have totals class");
+    assert!(
+        stdout.contains("class=\"totals totals-main\""),
+        "should have totals class"
+    );
     assert!(stdout.contains("TOTAL"), "should contain TOTAL in tfoot");
 }
 
@@ -431,13 +541,29 @@ fn test_sl_output_markdown() {
     let path = f.path().to_str().unwrap();
 
     let output = sl_cmd()
-        .args(["sl", "--file", path, "--per", "session", "--output", "markdown", "--filename", "/dev/stdout"])
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "session",
+            "--output",
+            "markdown",
+            "--filename",
+            "/dev/stdout",
+        ])
         .output()
         .expect("run command");
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("| Session |"), "should have markdown header");
-    assert!(stdout.contains("Segments"), "should use full 'Segments' not 'Segs'");
+    assert!(
+        stdout.contains("| Session |"),
+        "should have markdown header"
+    );
+    assert!(
+        stdout.contains("Segments"),
+        "should use full 'Segments' not 'Segs'"
+    );
     assert!(stdout.contains("| :--- |"), "should have alignment row");
     assert!(stdout.contains("**TOTAL**"), "should have bold TOTAL");
 }
@@ -449,14 +575,27 @@ fn test_sl_output_tsv() {
     let path = f.path().to_str().unwrap();
 
     let output = sl_cmd()
-        .args(["sl", "--file", path, "--per", "day", "--output", "tsv", "--filename", "/dev/stdout"])
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "day",
+            "--output",
+            "tsv",
+            "--filename",
+            "/dev/stdout",
+        ])
         .output()
         .expect("run command");
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
     let first_line = stdout.lines().next().unwrap();
     assert!(first_line.contains('\t'), "TSV should be tab-separated");
-    assert!(first_line.contains("Date"), "TSV header should contain Date");
+    assert!(
+        first_line.contains("Date"),
+        "TSV header should contain Date"
+    );
     assert!(stdout.contains("TOTAL"), "TSV should have TOTAL row");
 }
 
@@ -480,12 +619,220 @@ fn test_sl_1h_output_html() {
     let path = f.path().to_str().unwrap();
 
     let output = sl_cmd()
-        .args(["sl", "--file", path, "--per", "1h", "--output", "html", "--filename", "/dev/stdout"])
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "1h",
+            "--output",
+            "html",
+            "--filename",
+            "/dev/stdout",
+        ])
         .output()
         .expect("run command");
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("5h Resets"), "1h HTML should have 5h Resets column");
-    assert!(stdout.contains("Est 5h Budget"), "1h HTML should have full 'Est 5h Budget'");
-    assert!(stdout.contains("Sessions"), "1h HTML should use full 'Sessions' not 'Sess'");
+    assert!(
+        stdout.contains("5h Resets"),
+        "1h HTML should have 5h Resets column"
+    );
+    assert!(
+        stdout.contains("Est 5h Budget"),
+        "1h HTML should have full 'Est 5h Budget'"
+    );
+    assert!(
+        stdout.contains("Sessions"),
+        "1h HTML should use full 'Sessions' not 'Sess'"
+    );
+}
+
+/// 22. --order desc reverses row order (first window should come last).
+#[test]
+fn test_sl_order_desc() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let asc_output = sl_cmd()
+        .args(["sl", "--file", path, "--per", "5h", "--order", "asc"])
+        .output()
+        .expect("run asc");
+    let desc_output = sl_cmd()
+        .args(["sl", "--file", path, "--per", "5h", "--order", "desc"])
+        .output()
+        .expect("run desc");
+
+    let asc_str = String::from_utf8(asc_output.stdout).unwrap();
+    let desc_str = String::from_utf8(desc_output.stdout).unwrap();
+
+    // Both should succeed and contain data
+    assert!(asc_output.status.success());
+    assert!(desc_output.status.success());
+
+    // They should differ (rows are reversed, TOTAL stays at bottom)
+    assert_ne!(
+        asc_str, desc_str,
+        "asc and desc should produce different output"
+    );
+}
+
+/// 23. --chart with --output json should error.
+#[test]
+fn test_sl_chart_output_conflict() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--chart", "5h", "--output", "json"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--chart only supports txt"));
+}
+
+/// 24. --per action TOTAL cost accumulates correctly even when pct is unchanged.
+///     Regression test: skipped records (same pct pair) must not lose cost delta.
+///     Fixture: 3 records, costs 0→1→2, pct 10%→10%→11%.
+///     Record 2 is skipped (same pct as record 1). Record 3's delta should be $2 (not $1).
+///     TOTAL should be $2.00.
+#[test]
+fn test_sl_action_cost_skipped_pct() {
+    let sess = "sess-test-skip-0000-000000000000";
+    let t = 1774483200_i64;
+    let r5 = 1774497600_i64;
+    let r7 = 1774605600_i64;
+
+    let lines: Vec<String> = vec![
+        make_sl_line(
+            t + 100,
+            sess,
+            0.0,
+            1000,
+            400,
+            0,
+            0,
+            Some(10),
+            Some(60),
+            Some(r5),
+            Some(r7),
+        ),
+        // Same pct (10%, 60%) — will be skipped by dedup, cost=1.0
+        make_sl_line(
+            t + 200,
+            sess,
+            1.0,
+            2000,
+            800,
+            5,
+            2,
+            Some(10),
+            Some(60),
+            Some(r5),
+            Some(r7),
+        ),
+        // Pct changes to (11%, 60%) — should accumulate full delta $2.0
+        make_sl_line(
+            t + 300,
+            sess,
+            2.0,
+            3000,
+            1200,
+            10,
+            5,
+            Some(11),
+            Some(60),
+            Some(r5),
+            Some(r7),
+        ),
+    ];
+
+    let mut f = NamedTempFile::new().expect("create temp file");
+    for line in &lines {
+        writeln!(f, "{}", line).expect("write line");
+    }
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args(["sl", "--file", path, "--per", "action", "--cost", "decimal"])
+        .output()
+        .expect("run command");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    let total_line = stdout.lines().find(|l| l.contains("TOTAL")).unwrap();
+    assert!(
+        total_line.contains("$2.00"),
+        "TOTAL should be $2.00 (skipped record's cost must accumulate into next action). Got: {}",
+        total_line
+    );
+}
+
+/// 25. --cost-diff table should contain Cost(SL), Cost(LiteLLM), and TOTAL.
+#[test]
+fn test_sl_cost_diff_table() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "session", "--cost-diff"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Cost(SL)"))
+        .stdout(predicate::str::contains("Cost(LiteLLM)"))
+        .stdout(predicate::str::contains("Diff"))
+        .stdout(predicate::str::contains("TOTAL"));
+}
+
+/// 26. --cost-diff --output json should have meta/data structure.
+#[test]
+fn test_sl_cost_diff_json() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "session",
+            "--cost-diff",
+            "--output",
+            "json",
+            "--filename",
+            "/dev/stdout",
+        ])
+        .output()
+        .expect("run command");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("should be valid JSON");
+    assert_eq!(
+        parsed["meta"]["source"].as_str().unwrap_or(""),
+        "ccost-sl",
+        "should have meta.source = ccost-sl"
+    );
+    assert!(parsed["data"].is_array(), "should have data array");
+    assert!(parsed["totals"].is_object(), "should have totals object");
+}
+
+/// 27. --per action TOTAL with the standard test fixture.
+#[test]
+fn test_sl_action_cost_total() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args(["sl", "--file", path, "--per", "action", "--cost", "decimal"])
+        .output()
+        .expect("run command");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    let total_line = stdout.lines().find(|l| l.contains("TOTAL")).unwrap();
+    assert!(
+        total_line.contains("$3.50"),
+        "TOTAL cost should be $3.50 (sess1=$1.00 + sess2 seg1=$2.00 + sess2 seg2=$0.50). Got: {}",
+        total_line
+    );
 }

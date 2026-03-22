@@ -117,7 +117,10 @@ fn test_terminal_table_output() {
     // stdout should contain box-drawing characters and TOTAL
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
     assert!(
-        stdout.contains('\u{2502}') || stdout.contains('\u{2500}') || stdout.contains('│') || stdout.contains('─'),
+        stdout.contains('\u{2502}')
+            || stdout.contains('\u{2500}')
+            || stdout.contains('│')
+            || stdout.contains('─'),
         "Expected box-drawing characters in stdout"
     );
     assert!(stdout.contains("TOTAL"), "Expected TOTAL in stdout");
@@ -415,7 +418,10 @@ fn test_output_html() {
         content.contains("<!DOCTYPE html>"),
         "HTML should contain <!DOCTYPE html>"
     );
-    assert!(content.contains("<table>") || content.contains("<table "), "HTML should contain <table>");
+    assert!(
+        content.contains("<table>") || content.contains("<table "),
+        "HTML should contain <table>"
+    );
 }
 
 // ─── 11. File output: --output csv ──────────────────────────────────────────
@@ -509,7 +515,10 @@ fn test_output_txt() {
     let content = fs::read_to_string(&txt_path).unwrap();
     // Should contain box-drawing characters
     assert!(
-        content.contains('\u{2502}') || content.contains('\u{2500}') || content.contains('│') || content.contains('─'),
+        content.contains('\u{2502}')
+            || content.contains('\u{2500}')
+            || content.contains('│')
+            || content.contains('─'),
         "TXT output should contain box-drawing characters"
     );
     // Should NOT contain ANSI escape codes
@@ -624,7 +633,10 @@ fn test_filename_without_output() {
     let content = fs::read_to_string(&custom_path).unwrap();
     // Should contain table content
     assert!(
-        content.contains('\u{2502}') || content.contains('\u{2500}') || content.contains('│') || content.contains('─'),
+        content.contains('\u{2502}')
+            || content.contains('\u{2500}')
+            || content.contains('│')
+            || content.contains('─'),
         "custom.txt should contain box-drawing characters (table)"
     );
     // No ANSI escape codes
@@ -653,7 +665,11 @@ fn test_custom_pricing_data() {
             }
         }
     });
-    fs::write(&pricing_path, serde_json::to_string_pretty(&pricing_json).unwrap()).unwrap();
+    fs::write(
+        &pricing_path,
+        serde_json::to_string_pretty(&pricing_json).unwrap(),
+    )
+    .unwrap();
 
     Command::cargo_bin("ccost")
         .unwrap()
@@ -691,7 +707,9 @@ fn test_chart_cost_mode() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     // Chart output should contain cost label or braille characters (U+2800 range)
     let has_cost_label = stdout.contains("Cost ($)") || stdout.contains("Cost");
-    let has_braille = stdout.chars().any(|c| ('\u{2800}'..='\u{28FF}').contains(&c));
+    let has_braille = stdout
+        .chars()
+        .any(|c| ('\u{2800}'..='\u{28FF}').contains(&c));
     assert!(
         has_cost_label || has_braille,
         "Chart cost output should contain 'Cost ($)' or braille characters, got: {}",
@@ -720,7 +738,9 @@ fn test_chart_token_mode() {
     assert!(output.status.success(), "chart token should succeed");
     let stdout = String::from_utf8(output.stdout).unwrap();
     let has_token_label = stdout.contains("Tokens") || stdout.contains("Token");
-    let has_braille = stdout.chars().any(|c| ('\u{2800}'..='\u{28FF}').contains(&c));
+    let has_braille = stdout
+        .chars()
+        .any(|c| ('\u{2800}'..='\u{28FF}').contains(&c));
     assert!(
         has_token_label || has_braille,
         "Chart token output should contain 'Tokens' or braille characters, got: {}",
@@ -771,17 +791,44 @@ fn test_5hto_flag() {
     // Records at 10:00 and 14:00 on Mar 23
     // --5hto 2026-03-23T15:00:00 → from=10:00 to=15:00 → both should match
     let dir = make_fixture(&[
-        mock_rec("claude-sonnet-4-20250514", 1000, 500, 0, 0,
-            "2026-03-23T10:00:00Z", "req-1", "msg-1"),
-        mock_rec("claude-sonnet-4-20250514", 2000, 800, 0, 0,
-            "2026-03-23T14:00:00Z", "req-2", "msg-2"),
+        mock_rec(
+            "claude-sonnet-4-20250514",
+            1000,
+            500,
+            0,
+            0,
+            "2026-03-23T10:00:00Z",
+            "req-1",
+            "msg-1",
+        ),
+        mock_rec(
+            "claude-sonnet-4-20250514",
+            2000,
+            800,
+            0,
+            0,
+            "2026-03-23T14:00:00Z",
+            "req-2",
+            "msg-2",
+        ),
     ]);
-    let output = Command::cargo_bin("ccost").unwrap()
-        .args(["--5hto", "2026-03-23T15:00:00", "--tz", "UTC",
-               "--claude-dir", dir.path().to_str().unwrap(),
-               "--per", "day", "--output", "json"])
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--5hto",
+            "2026-03-23T15:00:00",
+            "--tz",
+            "UTC",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--per",
+            "day",
+            "--output",
+            "json",
+        ])
         .current_dir(dir.path())
-        .output().unwrap();
+        .output()
+        .unwrap();
 
     let stdout = String::from_utf8(output.stderr).unwrap();
     assert!(output.status.success());
@@ -790,7 +837,10 @@ fn test_5hto_flag() {
     if json_path.exists() {
         let content = fs::read_to_string(&json_path).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
-        assert!(!parsed["data"].as_array().unwrap().is_empty(), "5hto should include records in range");
+        assert!(
+            !parsed["data"].as_array().unwrap().is_empty(),
+            "5hto should include records in range"
+        );
     }
     let _ = stdout;
 }
@@ -800,8 +850,14 @@ fn test_5hto_flag() {
 #[test]
 fn test_invalid_date_format_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--from", "not-a-date", "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--from",
+            "not-a-date",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("invalid date format"));
@@ -810,8 +866,14 @@ fn test_invalid_date_format_error() {
 #[test]
 fn test_invalid_per_dimension_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--per", "banana", "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--per",
+            "banana",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("invalid dimension"));
@@ -820,8 +882,14 @@ fn test_invalid_per_dimension_error() {
 #[test]
 fn test_invalid_cost_mode_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--cost", "banana", "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--cost",
+            "banana",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("invalid value"));
@@ -830,8 +898,14 @@ fn test_invalid_cost_mode_error() {
 #[test]
 fn test_invalid_output_format_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--output", "banana", "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--output",
+            "banana",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("invalid format"));
@@ -840,8 +914,14 @@ fn test_invalid_output_format_error() {
 #[test]
 fn test_invalid_table_mode_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--table", "banana", "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--table",
+            "banana",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("invalid mode"));
@@ -850,8 +930,14 @@ fn test_invalid_table_mode_error() {
 #[test]
 fn test_invalid_chart_mode_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--chart", "banana", "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--chart",
+            "banana",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("invalid mode"));
@@ -862,31 +948,56 @@ fn test_invalid_chart_mode_error() {
 #[test]
 fn test_5h_conflict_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--5hfrom", "2026-03-23T10:00:00", "--5hto", "2026-03-23T15:00:00",
-               "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--5hfrom",
+            "2026-03-23T10:00:00",
+            "--5hto",
+            "2026-03-23T15:00:00",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("--5hfrom and --5hto cannot be used together"));
+        .stderr(predicate::str::contains(
+            "--5hfrom and --5hto cannot be used together",
+        ));
 }
 
 #[test]
 fn test_1w_conflict_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--1wfrom", "2026-03-18T00:00:00", "--1wto", "2026-03-25T00:00:00",
-               "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--1wfrom",
+            "2026-03-18T00:00:00",
+            "--1wto",
+            "2026-03-25T00:00:00",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("--1wfrom and --1wto cannot be used together"));
+        .stderr(predicate::str::contains(
+            "--1wfrom and --1wto cannot be used together",
+        ));
 }
 
 #[test]
 fn test_5h_1w_conflict_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--5hfrom", "2026-03-23T10:00:00", "--1wfrom", "2026-03-18T00:00:00",
-               "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--5hfrom",
+            "2026-03-23T10:00:00",
+            "--1wfrom",
+            "2026-03-18T00:00:00",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--5h* and --1w*"));
@@ -895,9 +1006,16 @@ fn test_5h_1w_conflict_error() {
 #[test]
 fn test_from_with_5h_conflict_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--from", "2026-03-20", "--5hfrom", "2026-03-23T10:00:00",
-               "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--from",
+            "2026-03-20",
+            "--5hfrom",
+            "2026-03-23T10:00:00",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("cannot be used with --from/--to"));
@@ -906,20 +1024,37 @@ fn test_from_with_5h_conflict_error() {
 #[test]
 fn test_live_pricing_and_pricing_data_conflict() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--live-pricing", "--pricing-data", "/some/file.json",
-               "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--live-pricing",
+            "--pricing-data",
+            "/some/file.json",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("--live-pricing and --pricing-data cannot be used together"));
+        .stderr(predicate::str::contains(
+            "--live-pricing and --pricing-data cannot be used together",
+        ));
 }
 
 #[test]
 fn test_per_max_two_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--per", "day", "--per", "model", "--per", "session",
-               "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--per",
+            "day",
+            "--per",
+            "model",
+            "--per",
+            "session",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("maximum 2 values"));
@@ -930,8 +1065,14 @@ fn test_per_max_two_error() {
 #[test]
 fn test_invalid_order_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--order", "banana", "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--order",
+            "banana",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("invalid value"));
@@ -945,7 +1086,8 @@ fn test_empty_claude_dir() {
     let proj_dir = dir.path().join("projects");
     fs::create_dir_all(&proj_dir).unwrap();
 
-    Command::cargo_bin("ccost").unwrap()
+    Command::cargo_bin("ccost")
+        .unwrap()
         .args(["--claude-dir", dir.path().to_str().unwrap(), "--tz", "UTC"])
         .assert()
         .success();
@@ -959,9 +1101,18 @@ fn test_filename_with_output_json() {
     let out_dir = TempDir::new().unwrap();
     let custom_path = out_dir.path().join("report.json");
 
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--output", "json", "--filename", custom_path.to_str().unwrap(),
-               "--claude-dir", dir.path().to_str().unwrap(), "--tz", "UTC"])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--output",
+            "json",
+            "--filename",
+            custom_path.to_str().unwrap(),
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
         .assert()
         .success();
 
@@ -976,15 +1127,29 @@ fn test_filename_with_output_json() {
 #[test]
 fn test_per_model_only() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("ccost").unwrap()
-        .args(["--per", "model", "--claude-dir", dir.path().to_str().unwrap(),
-               "--tz", "UTC"])
-        .output().unwrap();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--per",
+            "model",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
 
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("sonnet-4"), "should show shortened model name");
+    assert!(
+        stdout.contains("sonnet-4"),
+        "should show shortened model name"
+    );
     // "└─ " (with trailing space) is the child row prefix; table borders use └── without space
-    assert!(!stdout.contains("└─ "), "single dimension should not have child rows");
+    assert!(
+        !stdout.contains("└─ "),
+        "single dimension should not have child rows"
+    );
 }
 
 // ─── 28. --chart with --output txt (allowed) ──────────────────────────
@@ -994,10 +1159,18 @@ fn test_chart_with_output_txt_allowed() {
     let dir = two_record_fixture();
     let out_dir = TempDir::new().unwrap();
 
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--chart", "cost", "--output", "txt",
-               "--claude-dir", dir.path().to_str().unwrap(),
-               "--tz", "UTC"])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--chart",
+            "cost",
+            "--output",
+            "txt",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
         .current_dir(out_dir.path())
         .assert()
         .success();
@@ -1012,12 +1185,19 @@ fn test_chart_with_output_txt_allowed() {
 fn test_table_auto_wide_terminal() {
     // COLUMNS=200 → wide terminal → should show full table (Cache Cr visible)
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("ccost").unwrap()
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
         .env("COLUMNS", "200")
-        .args(["--table", "auto",
-               "--claude-dir", dir.path().to_str().unwrap(),
-               "--tz", "UTC"])
-        .output().unwrap();
+        .args([
+            "--table",
+            "auto",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(
@@ -1030,12 +1210,19 @@ fn test_table_auto_wide_terminal() {
 fn test_table_auto_narrow_terminal() {
     // COLUMNS=80 → narrow terminal → should show compact table (no Cache Cr)
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("ccost").unwrap()
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
         .env("COLUMNS", "80")
-        .args(["--table", "auto",
-               "--claude-dir", dir.path().to_str().unwrap(),
-               "--tz", "UTC"])
-        .output().unwrap();
+        .args([
+            "--table",
+            "auto",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(
@@ -1051,13 +1238,18 @@ fn test_table_auto_with_output_uses_full() {
     let out_dir = TempDir::new().unwrap();
     let out_file = out_dir.path().join("out.txt");
 
-    Command::cargo_bin("ccost").unwrap()
+    Command::cargo_bin("ccost")
+        .unwrap()
         .env("COLUMNS", "80") // narrow terminal, but shouldn't matter with --output
         .args([
-            "--output", "txt",
-            "--filename", out_file.to_str().unwrap(),
-            "--claude-dir", dir.path().to_str().unwrap(),
-            "--tz", "UTC",
+            "--output",
+            "txt",
+            "--filename",
+            out_file.to_str().unwrap(),
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
         ])
         .assert()
         .success();
@@ -1076,13 +1268,19 @@ fn test_table_compact_with_output_stays_compact() {
     let out_dir = TempDir::new().unwrap();
     let out_file = out_dir.path().join("out.txt");
 
-    Command::cargo_bin("ccost").unwrap()
+    Command::cargo_bin("ccost")
+        .unwrap()
         .args([
-            "--output", "txt",
-            "--table", "compact",
-            "--filename", out_file.to_str().unwrap(),
-            "--claude-dir", dir.path().to_str().unwrap(),
-            "--tz", "UTC",
+            "--output",
+            "txt",
+            "--table",
+            "compact",
+            "--filename",
+            out_file.to_str().unwrap(),
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
         ])
         .assert()
         .success();
@@ -1099,9 +1297,14 @@ fn test_table_compact_with_output_stays_compact() {
 #[test]
 fn test_copy_invalid_format_error() {
     let dir = two_record_fixture();
-    Command::cargo_bin("ccost").unwrap()
-        .args(["--copy", "banana",
-               "--claude-dir", dir.path().to_str().unwrap()])
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--copy",
+            "banana",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--copy: invalid format"));
@@ -1113,16 +1316,28 @@ fn test_copy_with_output_both_work() {
     let dir = two_record_fixture();
     let out_dir = TempDir::new().unwrap();
 
-    let output = Command::cargo_bin("ccost").unwrap()
-        .args(["--output", "json", "--copy", "markdown",
-               "--claude-dir", dir.path().to_str().unwrap(),
-               "--tz", "UTC"])
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--output",
+            "json",
+            "--copy",
+            "markdown",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
         .current_dir(out_dir.path())
-        .output().unwrap();
+        .output()
+        .unwrap();
 
     // The JSON file should still be written
     let json_path = out_dir.path().join("ccost.json");
-    assert!(json_path.exists(), "JSON file should still be created with --copy");
+    assert!(
+        json_path.exists(),
+        "JSON file should still be created with --copy"
+    );
 
     let stderr = String::from_utf8(output.stderr).unwrap();
     // Should show copy attempt (either success or error about missing clipboard tool)
@@ -1138,15 +1353,25 @@ fn test_copy_with_output_both_work() {
 fn test_copy_with_terminal_output() {
     // --copy alone should still print table to stdout
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("ccost").unwrap()
-        .args(["--copy", "json",
-               "--claude-dir", dir.path().to_str().unwrap(),
-               "--tz", "UTC"])
-        .output().unwrap();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--copy",
+            "json",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     // Table should still appear on stdout
-    assert!(stdout.contains("TOTAL"), "table should still appear on stdout with --copy");
+    assert!(
+        stdout.contains("TOTAL"),
+        "table should still appear on stdout with --copy"
+    );
 
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
@@ -1160,11 +1385,20 @@ fn test_copy_with_terminal_output() {
 #[test]
 fn test_copy_with_chart() {
     let dir = two_record_fixture();
-    let output = Command::cargo_bin("ccost").unwrap()
-        .args(["--chart", "cost", "--copy", "csv",
-               "--claude-dir", dir.path().to_str().unwrap(),
-               "--tz", "UTC"])
-        .output().unwrap();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--chart",
+            "cost",
+            "--copy",
+            "csv",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
 
     assert!(output.status.success(), "copy with chart should succeed");
 
