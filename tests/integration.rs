@@ -18,7 +18,11 @@ fn make_fixture(records: &[serde_json::Value]) -> TempDir {
 }
 
 /// Create a temp dir with JSONL fixture under an arbitrary project name and session file.
-fn make_fixture_in_project(records: &[serde_json::Value], project: &str, session_file: &str) -> TempDir {
+fn make_fixture_in_project(
+    records: &[serde_json::Value],
+    project: &str,
+    session_file: &str,
+) -> TempDir {
     let dir = TempDir::new().unwrap();
     let proj_dir = dir.path().join("projects").join(project);
     fs::create_dir_all(&proj_dir).unwrap();
@@ -89,15 +93,23 @@ fn test_full_pipeline_end_to_end() {
     let records = vec![
         mock_rec(
             "claude-opus-4-6",
-            100, 50, 0, 0,
+            100,
+            50,
+            0,
+            0,
             "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
+            "req_1",
+            "msg_1",
         ),
         mock_rec(
             "claude-3-5-haiku-20241022",
-            200, 80, 10, 20,
+            200,
+            80,
+            10,
+            20,
             "2026-03-23T11:00:00Z",
-            "req_2", "msg_2",
+            "req_2",
+            "msg_2",
         ),
     ];
     let dir = make_fixture(&records);
@@ -160,21 +172,33 @@ fn test_streaming_deduplication() {
     let records = vec![
         mock_rec(
             "claude-opus-4-6",
-            100, 10, 0, 0,
+            100,
+            10,
+            0,
+            0,
             "2026-03-23T10:00:00Z",
-            "req_dup", "msg_dup",
+            "req_dup",
+            "msg_dup",
         ),
         mock_rec(
             "claude-opus-4-6",
-            100, 30, 0, 0,
+            100,
+            30,
+            0,
+            0,
             "2026-03-23T10:00:00Z",
-            "req_dup", "msg_dup",
+            "req_dup",
+            "msg_dup",
         ),
         mock_rec(
             "claude-opus-4-6",
-            100, 50, 0, 0,
+            100,
+            50,
+            0,
+            0,
             "2026-03-23T10:00:00Z",
-            "req_dup", "msg_dup",
+            "req_dup",
+            "msg_dup",
         ),
     ];
     let dir = make_fixture(&records);
@@ -201,27 +225,43 @@ fn test_two_level_grouping() {
     let records = vec![
         mock_rec(
             "claude-opus-4-6",
-            100, 50, 0, 0,
+            100,
+            50,
+            0,
+            0,
             "2026-03-22T10:00:00Z",
-            "req_1", "msg_1",
+            "req_1",
+            "msg_1",
         ),
         mock_rec(
             "claude-3-5-haiku-20241022",
-            200, 80, 0, 0,
+            200,
+            80,
+            0,
+            0,
             "2026-03-22T11:00:00Z",
-            "req_2", "msg_2",
+            "req_2",
+            "msg_2",
         ),
         mock_rec(
             "claude-opus-4-6",
-            150, 60, 0, 0,
+            150,
+            60,
+            0,
+            0,
             "2026-03-23T10:00:00Z",
-            "req_3", "msg_3",
+            "req_3",
+            "msg_3",
         ),
         mock_rec(
             "claude-3-5-haiku-20241022",
-            250, 90, 0, 0,
+            250,
+            90,
+            0,
+            0,
             "2026-03-23T11:00:00Z",
-            "req_4", "msg_4",
+            "req_4",
+            "msg_4",
         ),
     ];
     let dir = make_fixture(&records);
@@ -276,21 +316,33 @@ fn test_date_range_filter() {
     let records = vec![
         mock_rec(
             "claude-opus-4-6",
-            100, 50, 0, 0,
+            100,
+            50,
+            0,
+            0,
             "2026-03-20T10:00:00Z",
-            "req_1", "msg_1",
+            "req_1",
+            "msg_1",
         ),
         mock_rec(
             "claude-opus-4-6",
-            200, 80, 0, 0,
+            200,
+            80,
+            0,
+            0,
             "2026-03-23T10:00:00Z",
-            "req_2", "msg_2",
+            "req_2",
+            "msg_2",
         ),
         mock_rec(
             "claude-opus-4-6",
-            300, 120, 0, 0,
+            300,
+            120,
+            0,
+            0,
             "2026-03-26T10:00:00Z",
-            "req_3", "msg_3",
+            "req_3",
+            "msg_3",
         ),
     ];
     let dir = make_fixture(&records);
@@ -320,21 +372,33 @@ fn test_model_filter() {
     let records = vec![
         mock_rec(
             "claude-opus-4-6",
-            100, 50, 0, 0,
+            100,
+            50,
+            0,
+            0,
             "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
+            "req_1",
+            "msg_1",
         ),
         mock_rec(
             "claude-3-5-haiku-20241022",
-            200, 80, 0, 0,
+            200,
+            80,
+            0,
+            0,
             "2026-03-23T11:00:00Z",
-            "req_2", "msg_2",
+            "req_2",
+            "msg_2",
         ),
         mock_rec(
             "claude-3-5-sonnet-20241022",
-            300, 120, 0, 0,
+            300,
+            120,
+            0,
+            0,
             "2026-03-23T12:00:00Z",
-            "req_3", "msg_3",
+            "req_3",
+            "msg_3",
         ),
     ];
     let dir = make_fixture(&records);
@@ -362,15 +426,23 @@ fn test_sort_order_asc() {
     let records = vec![
         mock_rec(
             "claude-opus-4-6",
-            100, 50, 0, 0,
+            100,
+            50,
+            0,
+            0,
             "2026-03-22T10:00:00Z",
-            "req_1", "msg_1",
+            "req_1",
+            "msg_1",
         ),
         mock_rec(
             "claude-opus-4-6",
-            200, 80, 0, 0,
+            200,
+            80,
+            0,
+            0,
             "2026-03-24T10:00:00Z",
-            "req_2", "msg_2",
+            "req_2",
+            "msg_2",
         ),
     ];
     let dir = make_fixture(&records);
@@ -387,7 +459,10 @@ fn test_sort_order_asc() {
     let grouped = group_records(&priced, &dims, Some(&group_opts_asc));
 
     assert_eq!(grouped.data.len(), 2);
-    assert_eq!(grouped.data[0].label, "2026-03-22", "asc: first should be earlier date");
+    assert_eq!(
+        grouped.data[0].label, "2026-03-22",
+        "asc: first should be earlier date"
+    );
     assert_eq!(grouped.data[1].label, "2026-03-24");
 }
 
@@ -396,15 +471,23 @@ fn test_sort_order_desc() {
     let records = vec![
         mock_rec(
             "claude-opus-4-6",
-            100, 50, 0, 0,
+            100,
+            50,
+            0,
+            0,
             "2026-03-22T10:00:00Z",
-            "req_1", "msg_1",
+            "req_1",
+            "msg_1",
         ),
         mock_rec(
             "claude-opus-4-6",
-            200, 80, 0, 0,
+            200,
+            80,
+            0,
+            0,
             "2026-03-24T10:00:00Z",
-            "req_2", "msg_2",
+            "req_2",
+            "msg_2",
         ),
     ];
     let dir = make_fixture(&records);
@@ -421,7 +504,10 @@ fn test_sort_order_desc() {
     let grouped = group_records(&priced, &dims, Some(&group_opts_desc));
 
     assert_eq!(grouped.data.len(), 2);
-    assert_eq!(grouped.data[0].label, "2026-03-24", "desc: first should be later date");
+    assert_eq!(
+        grouped.data[0].label, "2026-03-24",
+        "desc: first should be later date"
+    );
     assert_eq!(grouped.data[1].label, "2026-03-22");
 }
 
@@ -434,15 +520,23 @@ fn test_table_formatter_output() {
     let records = vec![
         mock_rec(
             "claude-opus-4-6",
-            100, 50, 10, 20,
+            100,
+            50,
+            10,
+            20,
             "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
+            "req_1",
+            "msg_1",
         ),
         mock_rec(
             "claude-3-5-haiku-20241022",
-            200, 80, 30, 40,
+            200,
+            80,
+            30,
+            40,
             "2026-03-23T11:00:00Z",
-            "req_2", "msg_2",
+            "req_2",
+            "msg_2",
         ),
     ];
     let dir = make_fixture(&records);
@@ -464,13 +558,25 @@ fn test_table_formatter_output() {
     let output = format_table(&grouped.data, &grouped.totals, &table_opts);
 
     // Box-drawing characters
-    assert!(output.contains('\u{250C}'), "should contain top-left corner");
-    assert!(output.contains('\u{2500}'), "should contain horizontal line");
+    assert!(
+        output.contains('\u{250C}'),
+        "should contain top-left corner"
+    );
+    assert!(
+        output.contains('\u{2500}'),
+        "should contain horizontal line"
+    );
     assert!(output.contains('\u{2502}'), "should contain vertical line");
-    assert!(output.contains('\u{2518}'), "should contain bottom-right corner");
+    assert!(
+        output.contains('\u{2518}'),
+        "should contain bottom-right corner"
+    );
 
     // Child prefix
-    assert!(output.contains("\u{2514}\u{2500}"), "should contain child prefix └─");
+    assert!(
+        output.contains("\u{2514}\u{2500}"),
+        "should contain child prefix └─"
+    );
 
     // TOTAL row
     assert!(output.contains("TOTAL"), "should contain TOTAL row");
@@ -482,14 +588,16 @@ fn test_table_formatter_output() {
 
 #[test]
 fn test_json_formatter_output() {
-    let records = vec![
-        mock_rec(
-            "claude-opus-4-6",
-            100, 50, 0, 0,
-            "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
-        ),
-    ];
+    let records = vec![mock_rec(
+        "claude-opus-4-6",
+        100,
+        50,
+        0,
+        0,
+        "2026-03-23T10:00:00Z",
+        "req_1",
+        "msg_1",
+    )];
     let dir = make_fixture(&records);
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
@@ -522,8 +630,8 @@ fn test_json_formatter_output() {
     let json_str = format_json(&grouped.data, &grouped.totals, &meta, dedup);
 
     // Parse it back
-    let parsed: serde_json::Value = serde_json::from_str(&json_str)
-        .expect("JSON output should parse");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&json_str).expect("JSON output should parse");
 
     // Assert top-level structure
     assert!(parsed.get("meta").is_some(), "should have meta");
@@ -566,15 +674,23 @@ fn test_cost_aggregation() {
     let records = vec![
         mock_rec(
             "claude-opus-4-6",
-            1000, 500, 100, 200,
+            1000,
+            500,
+            100,
+            200,
             "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
+            "req_1",
+            "msg_1",
         ),
         mock_rec(
             "claude-3-5-haiku-20241022",
-            2000, 800, 300, 400,
+            2000,
+            800,
+            300,
+            400,
             "2026-03-23T11:00:00Z",
-            "req_2", "msg_2",
+            "req_2",
+            "msg_2",
         ),
     ];
     let dir = make_fixture(&records);
@@ -620,15 +736,23 @@ fn test_load_records_meta() {
     let records = vec![
         mock_rec(
             "claude-opus-4-6",
-            100, 50, 0, 0,
+            100,
+            50,
+            0,
+            0,
             "2026-03-22T08:00:00Z",
-            "req_1", "msg_1",
+            "req_1",
+            "msg_1",
         ),
         mock_rec(
             "claude-3-5-haiku-20241022",
-            200, 80, 0, 0,
+            200,
+            80,
+            0,
+            0,
             "2026-03-24T16:00:00Z",
-            "req_2", "msg_2",
+            "req_2",
+            "msg_2",
         ),
     ];
     let dir = make_fixture(&records);
@@ -651,7 +775,10 @@ fn test_load_records_meta() {
     assert_eq!(result.meta.models.len(), 2);
     // BTreeSet produces sorted order
     assert!(result.meta.models.contains(&"claude-opus-4-6".to_string()));
-    assert!(result.meta.models.contains(&"claude-3-5-haiku-20241022".to_string()));
+    assert!(result
+        .meta
+        .models
+        .contains(&"claude-3-5-haiku-20241022".to_string()));
 
     // projects
     assert_eq!(result.meta.projects.len(), 1);
@@ -675,7 +802,10 @@ fn test_load_records_meta_empty() {
     let result = load_records(&opts);
 
     assert!(result.records.is_empty());
-    assert!(result.meta.earliest.is_none(), "empty fixture => None earliest");
+    assert!(
+        result.meta.earliest.is_none(),
+        "empty fixture => None earliest"
+    );
     assert!(result.meta.latest.is_none(), "empty fixture => None latest");
     assert!(result.meta.models.is_empty());
     assert!(result.meta.projects.is_empty());
@@ -688,14 +818,16 @@ fn test_load_records_meta_empty() {
 
 #[test]
 fn test_invalid_iana_timezone_no_panic() {
-    let records = vec![
-        mock_rec(
-            "claude-opus-4-6",
-            100, 50, 0, 0,
-            "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
-        ),
-    ];
+    let records = vec![mock_rec(
+        "claude-opus-4-6",
+        100,
+        50,
+        0,
+        0,
+        "2026-03-23T10:00:00Z",
+        "req_1",
+        "msg_1",
+    )];
     let dir = make_fixture(&records);
 
     // Use an invalid timezone string
@@ -707,7 +839,11 @@ fn test_invalid_iana_timezone_no_panic() {
 
     // Should not panic
     let result = load_records(&opts);
-    assert_eq!(result.records.len(), 1, "data should still be produced with invalid tz");
+    assert_eq!(
+        result.records.len(),
+        1,
+        "data should still be produced with invalid tz"
+    );
 
     // Also test grouping with invalid tz
     let pricing = load_pricing();
@@ -731,59 +867,71 @@ fn test_invalid_iana_timezone_no_panic() {
 fn test_hyphenated_project_dir_decoding() {
     // A directory named `-home-username-workspace-test` should decode to
     // `/home/username/workspace/test`
-    let records = vec![
-        mock_rec(
-            "claude-opus-4-6",
-            100, 50, 0, 0,
-            "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
-        ),
-    ];
-    let dir = make_fixture_in_project(&records, "-home-username-workspace-test", "session-abc.jsonl");
+    let records = vec![mock_rec(
+        "claude-opus-4-6",
+        100,
+        50,
+        0,
+        0,
+        "2026-03-23T10:00:00Z",
+        "req_1",
+        "msg_1",
+    )];
+    let dir = make_fixture_in_project(
+        &records,
+        "-home-username-workspace-test",
+        "session-abc.jsonl",
+    );
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
 
     assert_eq!(result.records.len(), 1);
     assert_eq!(
-        result.records[0].project,
-        "/home/username/workspace/test",
+        result.records[0].project, "/home/username/workspace/test",
         "hyphenated project dir should decode to full path"
     );
 }
 
 #[test]
 fn test_non_hyphenated_project_name_unchanged() {
-    let records = vec![
-        mock_rec(
-            "claude-opus-4-6",
-            100, 50, 0, 0,
-            "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
-        ),
-    ];
+    let records = vec![mock_rec(
+        "claude-opus-4-6",
+        100,
+        50,
+        0,
+        0,
+        "2026-03-23T10:00:00Z",
+        "req_1",
+        "msg_1",
+    )];
     let dir = make_fixture_in_project(&records, "my-cool-project", "session-abc.jsonl");
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
 
     assert_eq!(result.records.len(), 1);
     assert_eq!(
-        result.records[0].project,
-        "my-cool-project",
+        result.records[0].project, "my-cool-project",
         "non-hyphen-prefixed project name should stay unchanged"
     );
 }
 
 #[test]
 fn test_project_filter_with_decoded_path() {
-    let records = vec![
-        mock_rec(
-            "claude-opus-4-6",
-            100, 50, 0, 0,
-            "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
-        ),
-    ];
-    let dir = make_fixture_in_project(&records, "-home-username-workspace-test", "session-abc.jsonl");
+    let records = vec![mock_rec(
+        "claude-opus-4-6",
+        100,
+        50,
+        0,
+        0,
+        "2026-03-23T10:00:00Z",
+        "req_1",
+        "msg_1",
+    )];
+    let dir = make_fixture_in_project(
+        &records,
+        "-home-username-workspace-test",
+        "session-abc.jsonl",
+    );
 
     // Filter by a substring of the decoded path
     let opts = LoadOptions {
@@ -795,22 +943,29 @@ fn test_project_filter_with_decoded_path() {
 
     let result = load_records(&opts);
     assert_eq!(
-        result.records.len(), 1,
+        result.records.len(),
+        1,
         "--project filter should match decoded path"
     );
 }
 
 #[test]
 fn test_project_filter_excludes_non_matching() {
-    let records = vec![
-        mock_rec(
-            "claude-opus-4-6",
-            100, 50, 0, 0,
-            "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
-        ),
-    ];
-    let dir = make_fixture_in_project(&records, "-home-username-workspace-test", "session-abc.jsonl");
+    let records = vec![mock_rec(
+        "claude-opus-4-6",
+        100,
+        50,
+        0,
+        0,
+        "2026-03-23T10:00:00Z",
+        "req_1",
+        "msg_1",
+    )];
+    let dir = make_fixture_in_project(
+        &records,
+        "-home-username-workspace-test",
+        "session-abc.jsonl",
+    );
 
     let opts = LoadOptions {
         claude_dir: Some(dir.path().to_string_lossy().to_string()),
@@ -821,7 +976,8 @@ fn test_project_filter_excludes_non_matching() {
 
     let result = load_records(&opts);
     assert_eq!(
-        result.records.len(), 0,
+        result.records.len(),
+        0,
         "--project filter should exclude records from non-matching project"
     );
 }
@@ -834,9 +990,36 @@ fn test_project_filter_excludes_non_matching() {
 fn test_dedup_via_raw_api() {
     // Test deduplicate_streaming directly with varying output_tokens
     let raw_records: Vec<serde_json::Value> = vec![
-        mock_rec("claude-opus-4-6", 100, 10, 0, 0, "2026-03-23T10:00:00Z", "req_x", "msg_x"),
-        mock_rec("claude-opus-4-6", 100, 30, 0, 0, "2026-03-23T10:00:00Z", "req_x", "msg_x"),
-        mock_rec("claude-opus-4-6", 100, 50, 0, 0, "2026-03-23T10:00:00Z", "req_x", "msg_x"),
+        mock_rec(
+            "claude-opus-4-6",
+            100,
+            10,
+            0,
+            0,
+            "2026-03-23T10:00:00Z",
+            "req_x",
+            "msg_x",
+        ),
+        mock_rec(
+            "claude-opus-4-6",
+            100,
+            30,
+            0,
+            0,
+            "2026-03-23T10:00:00Z",
+            "req_x",
+            "msg_x",
+        ),
+        mock_rec(
+            "claude-opus-4-6",
+            100,
+            50,
+            0,
+            0,
+            "2026-03-23T10:00:00Z",
+            "req_x",
+            "msg_x",
+        ),
     ];
 
     let (deduped, stats) = deduplicate_streaming(&raw_records);
@@ -858,8 +1041,26 @@ fn test_dedup_via_raw_api() {
 fn test_dedup_different_keys_not_deduped() {
     // Records with different message IDs should not be deduplicated
     let raw_records: Vec<serde_json::Value> = vec![
-        mock_rec("claude-opus-4-6", 100, 10, 0, 0, "2026-03-23T10:00:00Z", "req_a", "msg_a"),
-        mock_rec("claude-opus-4-6", 100, 10, 0, 0, "2026-03-23T10:00:00Z", "req_b", "msg_b"),
+        mock_rec(
+            "claude-opus-4-6",
+            100,
+            10,
+            0,
+            0,
+            "2026-03-23T10:00:00Z",
+            "req_a",
+            "msg_a",
+        ),
+        mock_rec(
+            "claude-opus-4-6",
+            100,
+            10,
+            0,
+            0,
+            "2026-03-23T10:00:00Z",
+            "req_b",
+            "msg_b",
+        ),
     ];
 
     let (deduped, stats) = deduplicate_streaming(&raw_records);
@@ -885,20 +1086,25 @@ fn test_group_records_empty() {
 fn test_shorten_model_name() {
     assert_eq!(shorten_model_name("claude-opus-4-6-20250618"), "opus-4-6");
     assert_eq!(shorten_model_name("claude-3-5-haiku-20241022"), "3-5-haiku");
-    assert_eq!(shorten_model_name("claude-3-5-sonnet-20241022"), "3-5-sonnet");
+    assert_eq!(
+        shorten_model_name("claude-3-5-sonnet-20241022"),
+        "3-5-sonnet"
+    );
     assert_eq!(shorten_model_name("some-other-model"), "some-other-model");
 }
 
 #[test]
 fn test_table_compact_mode() {
-    let records = vec![
-        mock_rec(
-            "claude-opus-4-6",
-            1000, 500, 100, 200,
-            "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
-        ),
-    ];
+    let records = vec![mock_rec(
+        "claude-opus-4-6",
+        1000,
+        500,
+        100,
+        200,
+        "2026-03-23T10:00:00Z",
+        "req_1",
+        "msg_1",
+    )];
     let dir = make_fixture(&records);
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
@@ -920,21 +1126,29 @@ fn test_table_compact_mode() {
     assert!(output.contains("In Total"));
     assert!(output.contains("Out"));
     assert!(output.contains("Total"));
-    assert!(!output.contains("Cache Cr"), "compact mode should not show Cache Cr");
-    assert!(!output.contains("Cache Rd"), "compact mode should not show Cache Rd");
+    assert!(
+        !output.contains("Cache Cr"),
+        "compact mode should not show Cache Cr"
+    );
+    assert!(
+        !output.contains("Cache Rd"),
+        "compact mode should not show Cache Rd"
+    );
 }
 
 #[test]
 fn test_session_filter() {
     // Verify that the session filter works. The session ID is derived from the JSONL filename.
-    let records = vec![
-        mock_rec(
-            "claude-opus-4-6",
-            100, 50, 0, 0,
-            "2026-03-23T10:00:00Z",
-            "req_1", "msg_1",
-        ),
-    ];
+    let records = vec![mock_rec(
+        "claude-opus-4-6",
+        100,
+        50,
+        0,
+        0,
+        "2026-03-23T10:00:00Z",
+        "req_1",
+        "msg_1",
+    )];
 
     // Create fixture with a specific session filename
     let dir = make_fixture_in_project(&records, "test-project", "my-session-123.jsonl");
@@ -969,25 +1183,35 @@ fn test_multiple_sessions_in_meta() {
 
     let rec1 = mock_rec(
         "claude-opus-4-6",
-        100, 50, 0, 0,
+        100,
+        50,
+        0,
+        0,
         "2026-03-23T10:00:00Z",
-        "req_1", "msg_1",
+        "req_1",
+        "msg_1",
     );
     let rec2 = mock_rec(
         "claude-opus-4-6",
-        200, 80, 0, 0,
+        200,
+        80,
+        0,
+        0,
         "2026-03-23T11:00:00Z",
-        "req_2", "msg_2",
+        "req_2",
+        "msg_2",
     );
 
     fs::write(
         proj_dir.join("session-aaa.jsonl"),
         serde_json::to_string(&rec1).unwrap(),
-    ).unwrap();
+    )
+    .unwrap();
     fs::write(
         proj_dir.join("session-bbb.jsonl"),
         serde_json::to_string(&rec2).unwrap(),
-    ).unwrap();
+    )
+    .unwrap();
 
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
@@ -1011,18 +1235,26 @@ fn test_cross_file_dedup() {
 
     // Same record appears in both parent session and subagent file
     let rec = mock_rec(
-        "claude-opus-4-6", 100, 50, 0, 0,
-        "2026-03-23T10:00:00Z", "req_dup", "msg_dup",
+        "claude-opus-4-6",
+        100,
+        50,
+        0,
+        0,
+        "2026-03-23T10:00:00Z",
+        "req_dup",
+        "msg_dup",
     );
 
     fs::write(
         proj_dir.join("session-parent.jsonl"),
         serde_json::to_string(&rec).unwrap(),
-    ).unwrap();
+    )
+    .unwrap();
     fs::write(
         subagent_dir.join("session-sub.jsonl"),
         serde_json::to_string(&rec).unwrap(),
-    ).unwrap();
+    )
+    .unwrap();
 
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
@@ -1063,14 +1295,18 @@ fn test_timestamp_fallback_to_mtime() {
     fs::write(
         proj_dir.join("session.jsonl"),
         serde_json::to_string(&rec).unwrap(),
-    ).unwrap();
+    )
+    .unwrap();
 
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
 
     // Record should still be loaded with file mtime as timestamp
     assert_eq!(result.records.len(), 1);
-    assert!(result.meta.earliest.is_some(), "should have a timestamp from mtime");
+    assert!(
+        result.meta.earliest.is_some(),
+        "should have a timestamp from mtime"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1096,8 +1332,14 @@ fn test_synthetic_model_filtered() {
             }
         }),
         mock_rec(
-            "claude-opus-4-6", 200, 80, 0, 0,
-            "2026-03-23T11:00:00Z", "req_2", "msg_2",
+            "claude-opus-4-6",
+            200,
+            80,
+            0,
+            0,
+            "2026-03-23T11:00:00Z",
+            "req_2",
+            "msg_2",
         ),
     ];
     let dir = make_fixture(&records);
@@ -1133,7 +1375,11 @@ fn test_no_type_field_passes() {
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
 
-    assert_eq!(result.records.len(), 1, "record without type field should pass");
+    assert_eq!(
+        result.records.len(),
+        1,
+        "record without type field should pass"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1161,7 +1407,11 @@ fn test_invalid_type_filtered() {
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
 
-    assert_eq!(result.records.len(), 0, "type=system should be filtered out");
+    assert_eq!(
+        result.records.len(),
+        0,
+        "type=system should be filtered out"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1183,7 +1433,11 @@ fn test_missing_usage_filtered() {
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
 
-    assert_eq!(result.records.len(), 0, "records without usage should be filtered");
+    assert_eq!(
+        result.records.len(),
+        0,
+        "records without usage should be filtered"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1210,7 +1464,11 @@ fn test_missing_model_filtered() {
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
 
-    assert_eq!(result.records.len(), 0, "records without model should be filtered");
+    assert_eq!(
+        result.records.len(),
+        0,
+        "records without model should be filtered"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1245,7 +1503,11 @@ fn test_numeric_timestamp_in_pipeline() {
 
     assert_eq!(result.records.len(), 1);
     assert_eq!(
-        result.meta.earliest.unwrap().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        result
+            .meta
+            .earliest
+            .unwrap()
+            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
         "2024-03-23T08:00:00Z"
     );
 }
@@ -1282,7 +1544,11 @@ fn test_numeric_timestamp_seconds_in_pipeline() {
 
     assert_eq!(result.records.len(), 1);
     assert_eq!(
-        result.meta.earliest.unwrap().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        result
+            .meta
+            .earliest
+            .unwrap()
+            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
         "2024-03-23T08:00:00Z"
     );
 }
@@ -1294,34 +1560,53 @@ fn test_numeric_timestamp_seconds_in_pipeline() {
 fn make_hierarchy_data() -> (Vec<GroupedData>, GroupedData) {
     let child1 = GroupedData {
         label: "opus-4-6".to_string(),
-        input_tokens: 100, output_tokens: 50,
-        cache_creation_tokens: 10, cache_read_tokens: 20,
-        input_cost: 0.01, cache_creation_cost: 0.002,
-        cache_read_cost: 0.003, output_cost: 0.005,
-        total_cost: 0.02, children: None,
+        input_tokens: 100,
+        output_tokens: 50,
+        cache_creation_tokens: 10,
+        cache_read_tokens: 20,
+        input_cost: 0.01,
+        cache_creation_cost: 0.002,
+        cache_read_cost: 0.003,
+        output_cost: 0.005,
+        total_cost: 0.02,
+        children: None,
     };
     let child2 = GroupedData {
         label: "3-5-haiku".to_string(),
-        input_tokens: 200, output_tokens: 80,
-        cache_creation_tokens: 30, cache_read_tokens: 40,
-        input_cost: 0.001, cache_creation_cost: 0.0005,
-        cache_read_cost: 0.0003, output_cost: 0.002,
-        total_cost: 0.004, children: None,
+        input_tokens: 200,
+        output_tokens: 80,
+        cache_creation_tokens: 30,
+        cache_read_tokens: 40,
+        input_cost: 0.001,
+        cache_creation_cost: 0.0005,
+        cache_read_cost: 0.0003,
+        output_cost: 0.002,
+        total_cost: 0.004,
+        children: None,
     };
     let parent = GroupedData {
         label: "2026-03-23".to_string(),
-        input_tokens: 300, output_tokens: 130,
-        cache_creation_tokens: 40, cache_read_tokens: 60,
-        input_cost: 0.011, cache_creation_cost: 0.0025,
-        cache_read_cost: 0.0033, output_cost: 0.007,
-        total_cost: 0.024, children: Some(vec![child1.clone(), child2.clone()]),
+        input_tokens: 300,
+        output_tokens: 130,
+        cache_creation_tokens: 40,
+        cache_read_tokens: 60,
+        input_cost: 0.011,
+        cache_creation_cost: 0.0025,
+        cache_read_cost: 0.0033,
+        output_cost: 0.007,
+        total_cost: 0.024,
+        children: Some(vec![child1.clone(), child2.clone()]),
     };
     let totals = GroupedData {
         label: "TOTAL".to_string(),
-        input_tokens: 300, output_tokens: 130,
-        cache_creation_tokens: 40, cache_read_tokens: 60,
-        input_cost: 0.011, cache_creation_cost: 0.0025,
-        cache_read_cost: 0.0033, output_cost: 0.007,
+        input_tokens: 300,
+        output_tokens: 130,
+        cache_creation_tokens: 40,
+        cache_read_tokens: 60,
+        input_cost: 0.011,
+        cache_creation_cost: 0.0025,
+        cache_read_cost: 0.0033,
+        output_cost: 0.007,
         total_cost: 0.024,
         children: Some(vec![child1, child2]),
     };
@@ -1342,8 +1627,14 @@ fn test_table_hierarchy_rendering() {
     let output = format_table(&data, &totals, &opts);
 
     assert!(output.contains("2026-03-23"), "should contain parent label");
-    assert!(output.contains("└─ opus-4-6"), "should contain child with prefix");
-    assert!(output.contains("└─ 3-5-haiku"), "should contain second child");
+    assert!(
+        output.contains("└─ opus-4-6"),
+        "should contain child with prefix"
+    );
+    assert!(
+        output.contains("└─ 3-5-haiku"),
+        "should contain second child"
+    );
     assert!(output.contains("TOTAL"), "should contain totals");
 }
 
@@ -1361,7 +1652,10 @@ fn test_markdown_hierarchy_rendering() {
 
     assert!(output.contains("2026-03-23"), "should contain parent label");
     assert!(output.contains("└─ opus-4-6"), "should contain child");
-    assert!(output.contains("└─ 3-5-haiku"), "should contain second child");
+    assert!(
+        output.contains("└─ 3-5-haiku"),
+        "should contain second child"
+    );
     assert!(output.contains("TOTAL"), "should contain totals");
     assert!(output.contains("|"), "should be markdown table");
 }
@@ -1399,7 +1693,10 @@ fn test_csv_hierarchy_rendering() {
     let output = format_csv(&data, &totals, &opts);
 
     assert!(output.contains("2026-03-23"), "should contain parent label");
-    assert!(output.contains("└─ opus-4-6"), "should contain child with prefix");
+    assert!(
+        output.contains("└─ opus-4-6"),
+        "should contain child with prefix"
+    );
     assert!(output.contains("TOTAL"), "should contain totals");
     // Count data rows (header + parent + 2 children + totals + 2 totals children = 7 lines)
     assert_eq!(output.lines().count(), 7);
@@ -1458,7 +1755,10 @@ fn test_html_compact() {
     };
     let output = format_html(&data, &totals, &opts);
 
-    assert!(!output.contains("Cache Creation"), "compact HTML should hide Cache Creation");
+    assert!(
+        !output.contains("Cache Creation"),
+        "compact HTML should hide Cache Creation"
+    );
     assert!(output.contains("Input Total"));
 }
 
@@ -1475,7 +1775,10 @@ fn test_csv_compact() {
     let output = format_csv(&data, &totals, &opts);
     let header = output.lines().next().unwrap();
 
-    assert!(!header.contains("Cache"), "compact CSV should not have Cache columns");
+    assert!(
+        !header.contains("Cache"),
+        "compact CSV should not have Cache columns"
+    );
     assert_eq!(header.split(',').count(), 4, "compact: label + 3 columns");
 }
 
@@ -1492,8 +1795,15 @@ fn test_csv_non_compact() {
     let output = format_csv(&data, &totals, &opts);
     let header = output.lines().next().unwrap();
 
-    assert!(header.contains("Cache Cr"), "non-compact CSV should have Cache Cr");
-    assert_eq!(header.split(',').count(), 7, "non-compact: label + 6 columns");
+    assert!(
+        header.contains("Cache Cr"),
+        "non-compact CSV should have Cache Cr"
+    );
+    assert_eq!(
+        header.split(',').count(),
+        7,
+        "non-compact: label + 6 columns"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1572,11 +1882,16 @@ fn test_table_empty_data() {
 
     let totals = GroupedData {
         label: "TOTAL".to_string(),
-        input_tokens: 0, output_tokens: 0,
-        cache_creation_tokens: 0, cache_read_tokens: 0,
-        input_cost: 0.0, cache_creation_cost: 0.0,
-        cache_read_cost: 0.0, output_cost: 0.0,
-        total_cost: 0.0, children: None,
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_creation_tokens: 0,
+        cache_read_tokens: 0,
+        input_cost: 0.0,
+        cache_creation_cost: 0.0,
+        cache_read_cost: 0.0,
+        output_cost: 0.0,
+        total_cost: 0.0,
+        children: None,
     };
     let opts = TableOptions {
         dimension_label: "Date".to_string(),
@@ -1585,7 +1900,10 @@ fn test_table_empty_data() {
         color: Some(false),
     };
     let output = format_table(&[], &totals, &opts);
-    assert!(output.contains("TOTAL"), "empty data should still have totals");
+    assert!(
+        output.contains("TOTAL"),
+        "empty data should still have totals"
+    );
 }
 
 #[test]
@@ -1594,11 +1912,16 @@ fn test_markdown_empty_data() {
 
     let totals = GroupedData {
         label: "TOTAL".to_string(),
-        input_tokens: 0, output_tokens: 0,
-        cache_creation_tokens: 0, cache_read_tokens: 0,
-        input_cost: 0.0, cache_creation_cost: 0.0,
-        cache_read_cost: 0.0, output_cost: 0.0,
-        total_cost: 0.0, children: None,
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_creation_tokens: 0,
+        cache_read_tokens: 0,
+        input_cost: 0.0,
+        cache_creation_cost: 0.0,
+        cache_read_cost: 0.0,
+        output_cost: 0.0,
+        total_cost: 0.0,
+        children: None,
     };
     let opts = MarkdownOptions {
         dimension_label: "Date".to_string(),
@@ -1615,11 +1938,16 @@ fn test_csv_empty_data() {
 
     let totals = GroupedData {
         label: "TOTAL".to_string(),
-        input_tokens: 0, output_tokens: 0,
-        cache_creation_tokens: 0, cache_read_tokens: 0,
-        input_cost: 0.0, cache_creation_cost: 0.0,
-        cache_read_cost: 0.0, output_cost: 0.0,
-        total_cost: 0.0, children: None,
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_creation_tokens: 0,
+        cache_read_tokens: 0,
+        input_cost: 0.0,
+        cache_creation_cost: 0.0,
+        cache_read_cost: 0.0,
+        output_cost: 0.0,
+        total_cost: 0.0,
+        children: None,
     };
     let opts = DsvOptions {
         dimension_label: "Date".to_string(),
@@ -1649,8 +1977,14 @@ fn test_table_compact_hides_cache() {
     };
     let output = format_table(&data, &totals, &opts);
 
-    assert!(!output.contains("Cache Cr"), "compact table should hide Cache Cr");
-    assert!(!output.contains("Cache Rd"), "compact table should hide Cache Rd");
+    assert!(
+        !output.contains("Cache Cr"),
+        "compact table should hide Cache Cr"
+    );
+    assert!(
+        !output.contains("Cache Rd"),
+        "compact table should hide Cache Rd"
+    );
     assert!(output.contains("In Total"));
 }
 
@@ -1672,7 +2006,10 @@ fn test_table_with_color() {
     let output = format_table(&data, &totals, &opts);
 
     // ANSI escape codes for green on TOTAL row
-    assert!(output.contains("\x1b["), "color=true should contain ANSI codes");
+    assert!(
+        output.contains("\x1b["),
+        "color=true should contain ANSI codes"
+    );
 }
 
 #[test]
@@ -1688,7 +2025,10 @@ fn test_table_without_color() {
     };
     let output = format_table(&data, &totals, &opts);
 
-    assert!(!output.contains("\x1b["), "color=false should not contain ANSI codes");
+    assert!(
+        !output.contains("\x1b["),
+        "color=false should not contain ANSI codes"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1717,14 +2057,20 @@ fn test_json_with_children() {
         generated_at: "2026-03-25T00:00:00Z".to_string(),
         pricing_date: "2026-03-25".to_string(),
     };
-    let dedup = DedupStats { before: 10, after: 8 };
+    let dedup = DedupStats {
+        before: 10,
+        after: 8,
+    };
 
     let json_str = format_json(&data, &totals, &meta, &dedup);
     let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
 
     // Data should have children
     let first_data = &parsed["data"][0];
-    assert!(first_data["children"].is_array(), "data entry should have children");
+    assert!(
+        first_data["children"].is_array(),
+        "data entry should have children"
+    );
     assert_eq!(first_data["children"].as_array().unwrap().len(), 2);
 
     // Totals should have children
@@ -1756,7 +2102,10 @@ fn test_html_custom_title() {
     };
     let output = format_html(&data, &totals, &opts);
 
-    assert!(output.contains("My Custom Report"), "should contain custom title");
+    assert!(
+        output.contains("My Custom Report"),
+        "should contain custom title"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1765,10 +2114,16 @@ fn test_html_custom_title() {
 
 #[test]
 fn test_group_by_project() {
-    let records = vec![
-        mock_rec("claude-opus-4-6", 100, 50, 0, 0,
-            "2026-03-23T10:00:00Z", "req_1", "msg_1"),
-    ];
+    let records = vec![mock_rec(
+        "claude-opus-4-6",
+        100,
+        50,
+        0,
+        0,
+        "2026-03-23T10:00:00Z",
+        "req_1",
+        "msg_1",
+    )];
     let dir = make_fixture(&records);
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
@@ -1785,10 +2140,16 @@ fn test_group_by_project() {
 
 #[test]
 fn test_group_by_session() {
-    let records = vec![
-        mock_rec("claude-opus-4-6", 100, 50, 0, 0,
-            "2026-03-23T10:00:00Z", "req_1", "msg_1"),
-    ];
+    let records = vec![mock_rec(
+        "claude-opus-4-6",
+        100,
+        50,
+        0,
+        0,
+        "2026-03-23T10:00:00Z",
+        "req_1",
+        "msg_1",
+    )];
     let dir = make_fixture(&records);
     let opts = default_load_opts(dir.path());
     let result = load_records(&opts);
@@ -1806,10 +2167,26 @@ fn test_group_by_session() {
 #[test]
 fn test_group_by_model() {
     let records = vec![
-        mock_rec("claude-opus-4-6", 100, 50, 0, 0,
-            "2026-03-23T10:00:00Z", "req_1", "msg_1"),
-        mock_rec("claude-3-5-haiku-20241022", 200, 80, 0, 0,
-            "2026-03-23T11:00:00Z", "req_2", "msg_2"),
+        mock_rec(
+            "claude-opus-4-6",
+            100,
+            50,
+            0,
+            0,
+            "2026-03-23T10:00:00Z",
+            "req_1",
+            "msg_1",
+        ),
+        mock_rec(
+            "claude-3-5-haiku-20241022",
+            200,
+            80,
+            0,
+            0,
+            "2026-03-23T11:00:00Z",
+            "req_2",
+            "msg_2",
+        ),
     ];
     let dir = make_fixture(&records);
     let opts = default_load_opts(dir.path());
@@ -1823,19 +2200,49 @@ fn test_group_by_model() {
 
     assert_eq!(grouped.data.len(), 2);
     let labels: Vec<&str> = grouped.data.iter().map(|d| d.label.as_str()).collect();
-    assert!(labels.contains(&"opus-4-6"), "model name should be shortened");
-    assert!(labels.contains(&"3-5-haiku"), "model name should strip date suffix");
+    assert!(
+        labels.contains(&"opus-4-6"),
+        "model name should be shortened"
+    );
+    assert!(
+        labels.contains(&"3-5-haiku"),
+        "model name should strip date suffix"
+    );
 }
 
 #[test]
 fn test_group_by_hour() {
     let records = vec![
-        mock_rec("claude-opus-4-6", 100, 50, 0, 0,
-            "2026-03-23T10:30:00Z", "req_1", "msg_1"),
-        mock_rec("claude-opus-4-6", 200, 80, 0, 0,
-            "2026-03-23T10:45:00Z", "req_2", "msg_2"),
-        mock_rec("claude-opus-4-6", 300, 120, 0, 0,
-            "2026-03-23T11:15:00Z", "req_3", "msg_3"),
+        mock_rec(
+            "claude-opus-4-6",
+            100,
+            50,
+            0,
+            0,
+            "2026-03-23T10:30:00Z",
+            "req_1",
+            "msg_1",
+        ),
+        mock_rec(
+            "claude-opus-4-6",
+            200,
+            80,
+            0,
+            0,
+            "2026-03-23T10:45:00Z",
+            "req_2",
+            "msg_2",
+        ),
+        mock_rec(
+            "claude-opus-4-6",
+            300,
+            120,
+            0,
+            0,
+            "2026-03-23T11:15:00Z",
+            "req_3",
+            "msg_3",
+        ),
     ];
     let dir = make_fixture(&records);
     let opts = default_load_opts(dir.path());
@@ -1857,10 +2264,26 @@ fn test_group_by_hour() {
 #[test]
 fn test_group_by_month() {
     let records = vec![
-        mock_rec("claude-opus-4-6", 100, 50, 0, 0,
-            "2026-03-23T10:00:00Z", "req_1", "msg_1"),
-        mock_rec("claude-opus-4-6", 200, 80, 0, 0,
-            "2026-04-05T10:00:00Z", "req_2", "msg_2"),
+        mock_rec(
+            "claude-opus-4-6",
+            100,
+            50,
+            0,
+            0,
+            "2026-03-23T10:00:00Z",
+            "req_1",
+            "msg_1",
+        ),
+        mock_rec(
+            "claude-opus-4-6",
+            200,
+            80,
+            0,
+            0,
+            "2026-04-05T10:00:00Z",
+            "req_2",
+            "msg_2",
+        ),
     ];
     let dir = make_fixture(&records);
     let opts = default_load_opts(dir.path());

@@ -1,5 +1,5 @@
+use super::table::{format_cost, format_tokens};
 use crate::types::{GroupedData, PriceMode};
-use super::table::{format_tokens, format_cost};
 
 pub struct MarkdownOptions {
     pub dimension_label: String,
@@ -27,7 +27,12 @@ struct RowData {
     cells: Vec<String>,
 }
 
-fn build_row(entry: &GroupedData, price_mode: PriceMode, compact: bool, label_prefix: &str) -> RowData {
+fn build_row(
+    entry: &GroupedData,
+    price_mode: PriceMode,
+    compact: bool,
+    label_prefix: &str,
+) -> RowData {
     let in_total = entry.input_tokens + entry.cache_creation_tokens + entry.cache_read_tokens;
     let in_total_cost = entry.input_cost + entry.cache_creation_cost + entry.cache_read_cost;
     let total = in_total + entry.output_tokens;
@@ -44,7 +49,11 @@ fn build_row(entry: &GroupedData, price_mode: PriceMode, compact: bool, label_pr
     } else {
         vec![
             format_cell(entry.input_tokens, entry.input_cost, price_mode),
-            format_cell(entry.cache_creation_tokens, entry.cache_creation_cost, price_mode),
+            format_cell(
+                entry.cache_creation_tokens,
+                entry.cache_creation_cost,
+                price_mode,
+            ),
             format_cell(entry.cache_read_tokens, entry.cache_read_cost, price_mode),
             format_cell(in_total, in_total_cost, price_mode),
             format_cell(entry.output_tokens, entry.output_cost, price_mode),
@@ -83,7 +92,13 @@ pub fn format_markdown(
 
     // Header row
     output.push_str("| ");
-    output.push_str(&headers.iter().map(|h| escape_pipe(h)).collect::<Vec<_>>().join(" | "));
+    output.push_str(
+        &headers
+            .iter()
+            .map(|h| escape_pipe(h))
+            .collect::<Vec<_>>()
+            .join(" | "),
+    );
     output.push_str(" |\n");
 
     // Separator row
@@ -113,7 +128,12 @@ pub fn format_markdown(
 
         if let Some(ref children) = entry.children {
             for child in children {
-                let child_row = build_row(child, options.price_mode, options.compact, "\u{2514}\u{2500} ");
+                let child_row = build_row(
+                    child,
+                    options.price_mode,
+                    options.compact,
+                    "\u{2514}\u{2500} ",
+                );
                 output.push_str("| ");
                 output.push_str(&escape_pipe(&child_row.label));
                 for cell in &child_row.cells {
@@ -137,7 +157,12 @@ pub fn format_markdown(
     // Totals children
     if let Some(ref children) = totals.children {
         for child in children {
-            let child_row = build_row(child, options.price_mode, options.compact, "\u{2514}\u{2500} ");
+            let child_row = build_row(
+                child,
+                options.price_mode,
+                options.compact,
+                "\u{2514}\u{2500} ",
+            );
             output.push_str("| ");
             output.push_str(&escape_pipe(&child_row.label));
             for cell in &child_row.cells {

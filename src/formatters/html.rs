@@ -1,5 +1,5 @@
+use super::table::{format_cost, format_tokens};
 use crate::types::{GroupedData, PriceMode};
-use super::table::{format_tokens, format_cost};
 
 pub struct HtmlOptions {
     pub dimension_label: String,
@@ -32,7 +32,12 @@ struct RowData {
     cells: Vec<String>,
 }
 
-fn build_row_html(entry: &GroupedData, price_mode: PriceMode, compact: bool, label_prefix: &str) -> RowData {
+fn build_row_html(
+    entry: &GroupedData,
+    price_mode: PriceMode,
+    compact: bool,
+    label_prefix: &str,
+) -> RowData {
     let in_total = entry.input_tokens + entry.cache_creation_tokens + entry.cache_read_tokens;
     let in_total_cost = entry.input_cost + entry.cache_creation_cost + entry.cache_read_cost;
     let total = in_total + entry.output_tokens;
@@ -49,7 +54,11 @@ fn build_row_html(entry: &GroupedData, price_mode: PriceMode, compact: bool, lab
     } else {
         vec![
             format_cell_html(entry.input_tokens, entry.input_cost, price_mode),
-            format_cell_html(entry.cache_creation_tokens, entry.cache_creation_cost, price_mode),
+            format_cell_html(
+                entry.cache_creation_tokens,
+                entry.cache_creation_cost,
+                price_mode,
+            ),
             format_cell_html(entry.cache_read_tokens, entry.cache_read_cost, price_mode),
             format_cell_html(in_total, in_total_cost, price_mode),
             format_cell_html(entry.output_tokens, entry.output_cost, price_mode),
@@ -60,11 +69,7 @@ fn build_row_html(entry: &GroupedData, price_mode: PriceMode, compact: bool, lab
     RowData { label, cells }
 }
 
-pub fn format_html(
-    data: &[GroupedData],
-    totals: &GroupedData,
-    options: &HtmlOptions,
-) -> String {
+pub fn format_html(data: &[GroupedData], totals: &GroupedData, options: &HtmlOptions) -> String {
     let title = options.title.as_deref().unwrap_or("ccost report");
     let is_default_title = options.title.is_none();
 
@@ -127,7 +132,12 @@ pub fn format_html(
 
         if let Some(ref children) = entry.children {
             for child in children {
-                let child_row = build_row_html(child, options.price_mode, options.compact, "\u{2514}\u{2500} ");
+                let child_row = build_row_html(
+                    child,
+                    options.price_mode,
+                    options.compact,
+                    "\u{2514}\u{2500} ",
+                );
                 html.push_str("<tr class=\"child\">\n");
                 html.push_str(&format!("<td>{}</td>\n", child_row.label));
                 for cell in &child_row.cells {
@@ -152,7 +162,12 @@ pub fn format_html(
     // Totals children
     if let Some(ref children) = totals.children {
         for child in children {
-            let child_row = build_row_html(child, options.price_mode, options.compact, "\u{2514}\u{2500} ");
+            let child_row = build_row_html(
+                child,
+                options.price_mode,
+                options.compact,
+                "\u{2514}\u{2500} ",
+            );
             html.push_str("<tr class=\"totals totals-child\">\n");
             html.push_str(&format!("<td>{}</td>\n", child_row.label));
             for cell in &child_row.cells {
@@ -274,7 +289,8 @@ th.sort-desc .arrow-down {
 }"#;
 
 fn build_js(_num_cols: usize) -> String {
-    format!(r#"(function() {{
+    format!(
+        r#"(function() {{
   const table = document.querySelector('table');
   const thead = table.querySelector('thead');
   const tbody = table.querySelector('tbody');
@@ -369,7 +385,8 @@ fn build_js(_num_cols: usize) -> String {
       }}
     }});
   }});
-}})();"#, )
+}})();"#,
+    )
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
-use ccost::sl::types::*;
 use ccost::sl::formatter::*;
+use ccost::sl::types::*;
 use ccost::types::PriceMode;
 use chrono::{TimeZone, Utc};
 
@@ -17,9 +17,15 @@ fn make_ratelimit_entry(
         ts: Utc.timestamp_opt(ts_secs, 0).single().unwrap(),
         session_id: session_id.to_string(),
         five_hour_pct,
-        five_hour_resets_at: Utc.timestamp_opt(five_hour_resets_secs, 0).single().unwrap(),
+        five_hour_resets_at: Utc
+            .timestamp_opt(five_hour_resets_secs, 0)
+            .single()
+            .unwrap(),
         seven_day_pct,
-        seven_day_resets_at: Utc.timestamp_opt(seven_day_resets_secs, 0).single().unwrap(),
+        seven_day_resets_at: Utc
+            .timestamp_opt(seven_day_resets_secs, 0)
+            .single()
+            .unwrap(),
         cost_delta: 0.0,
     }
 }
@@ -106,7 +112,10 @@ fn test_fmt_duration_large() {
 
 #[test]
 fn test_shorten_project_deep_path() {
-    assert_eq!(shorten_project("/home/user/projects/foo/bar"), ".../foo/bar");
+    assert_eq!(
+        shorten_project("/home/user/projects/foo/bar"),
+        ".../foo/bar"
+    );
 }
 
 #[test]
@@ -135,7 +144,12 @@ fn test_shorten_project_no_slash() {
 #[test]
 fn test_ratelimit_table_headers_full() {
     let entries = vec![make_ratelimit_entry(
-        1_774_483_200, "session-abc123", 30, 1_774_500_000, 50, 1_775_000_000,
+        1_774_483_200,
+        "session-abc123",
+        30,
+        1_774_500_000,
+        50,
+        1_775_000_000,
     )];
     let opts = SlFormatOptions {
         tz: Some("UTC".to_string()),
@@ -156,7 +170,12 @@ fn test_ratelimit_table_headers_full() {
 #[test]
 fn test_ratelimit_table_compact_no_session_column() {
     let entries = vec![make_ratelimit_entry(
-        1_774_483_200, "session-abc123", 30, 1_774_500_000, 50, 1_775_000_000,
+        1_774_483_200,
+        "session-abc123",
+        30,
+        1_774_500_000,
+        50,
+        1_775_000_000,
     )];
     let opts = SlFormatOptions {
         tz: Some("UTC".to_string()),
@@ -166,7 +185,10 @@ fn test_ratelimit_table_compact_no_session_column() {
     };
     let result = format_sl_ratelimit_table(&entries, &opts);
 
-    assert!(!result.contains("Session"), "compact should hide Session column");
+    assert!(
+        !result.contains("Session"),
+        "compact should hide Session column"
+    );
     assert!(result.contains("5h%"), "should still contain 5h%");
     assert!(result.contains("1w%"), "should still contain 1w%");
 }
@@ -174,7 +196,12 @@ fn test_ratelimit_table_compact_no_session_column() {
 #[test]
 fn test_ratelimit_table_percentage_values() {
     let entries = vec![make_ratelimit_entry(
-        1_774_483_200, "session-abc123", 45, 1_774_500_000, 72, 1_775_000_000,
+        1_774_483_200,
+        "session-abc123",
+        45,
+        1_774_500_000,
+        72,
+        1_775_000_000,
     )];
     let opts = SlFormatOptions {
         tz: Some("UTC".to_string()),
@@ -191,7 +218,12 @@ fn test_ratelimit_table_percentage_values() {
 fn test_ratelimit_table_session_truncated_to_8() {
     // session_id = "session-abc123" → first 8 chars = "session-"
     let entries = vec![make_ratelimit_entry(
-        1_774_483_200, "session-abc123", 30, 1_774_500_000, 50, 1_775_000_000,
+        1_774_483_200,
+        "session-abc123",
+        30,
+        1_774_500_000,
+        50,
+        1_775_000_000,
     )];
     let opts = SlFormatOptions {
         tz: Some("UTC".to_string()),
@@ -204,7 +236,10 @@ fn test_ratelimit_table_session_truncated_to_8() {
     // Should NOT contain the full session id beyond 8 chars (we only truncate in the table)
     // "abc123" would appear only if the full id were shown
     // Since "session-abc123" truncated is "session-", "abc123" should not appear
-    assert!(!result.contains("abc123"), "full session id beyond 8 chars should not appear");
+    assert!(
+        !result.contains("abc123"),
+        "full session id beyond 8 chars should not appear"
+    );
 }
 
 #[test]
@@ -217,14 +252,22 @@ fn test_ratelimit_table_empty() {
     };
     let result = format_sl_ratelimit_table(&[], &opts);
     // Still has headers in a box table
-    assert!(result.contains("Time"), "empty table should still have headers");
+    assert!(
+        result.contains("Time"),
+        "empty table should still have headers"
+    );
 }
 
 #[test]
 fn test_ratelimit_table_time_format() {
     // 2026-03-26T00:00:00Z should format as "03-26 00:00" in short format
     let entries = vec![make_ratelimit_entry(
-        1_774_483_200, "s1", 30, 1_774_500_000, 50, 1_775_000_000,
+        1_774_483_200,
+        "s1",
+        30,
+        1_774_500_000,
+        50,
+        1_775_000_000,
     )];
     let opts = SlFormatOptions {
         tz: Some("UTC".to_string()),
@@ -233,13 +276,21 @@ fn test_ratelimit_table_time_format() {
         color: false,
     };
     let result = format_sl_ratelimit_table(&entries, &opts);
-    assert!(result.contains("03-26 00:00"), "time should be formatted as MM-DD HH:MM");
+    assert!(
+        result.contains("03-26 00:00"),
+        "time should be formatted as MM-DD HH:MM"
+    );
 }
 
 #[test]
 fn test_ratelimit_table_is_box_drawing() {
     let entries = vec![make_ratelimit_entry(
-        1_774_483_200, "s1", 30, 1_774_500_000, 50, 1_775_000_000,
+        1_774_483_200,
+        "s1",
+        30,
+        1_774_500_000,
+        50,
+        1_775_000_000,
     )];
     let opts = SlFormatOptions {
         tz: Some("UTC".to_string()),
@@ -248,8 +299,14 @@ fn test_ratelimit_table_is_box_drawing() {
         color: false,
     };
     let result = format_sl_ratelimit_table(&entries, &opts);
-    assert!(result.contains('┌'), "should use box-drawing top-left corner");
-    assert!(result.contains('┘'), "should use box-drawing bottom-right corner");
+    assert!(
+        result.contains('┌'),
+        "should use box-drawing top-left corner"
+    );
+    assert!(
+        result.contains('┘'),
+        "should use box-drawing bottom-right corner"
+    );
     assert!(result.contains('│'), "should use box-drawing vertical bar");
 }
 
@@ -258,7 +315,15 @@ fn test_ratelimit_table_is_box_drawing() {
 #[test]
 fn test_session_table_full_headers() {
     let sessions = vec![make_session_summary(
-        "abc123", "/home/user/foo/bar", 0.50, 3_600_000, 1_800_000, 100, 50, Some(75), 2,
+        "abc123",
+        "/home/user/foo/bar",
+        0.50,
+        3_600_000,
+        1_800_000,
+        100,
+        50,
+        Some(75),
+        2,
     )];
     let opts = SlFormatOptions {
         tz: Some("UTC".to_string()),
@@ -281,7 +346,15 @@ fn test_session_table_full_headers() {
 #[test]
 fn test_session_table_compact_headers() {
     let sessions = vec![make_session_summary(
-        "abc123", "/home/user/foo/bar", 0.50, 3_600_000, 1_800_000, 100, 50, Some(75), 2,
+        "abc123",
+        "/home/user/foo/bar",
+        0.50,
+        3_600_000,
+        1_800_000,
+        100,
+        50,
+        Some(75),
+        2,
     )];
     let opts = SlFormatOptions {
         tz: Some("UTC".to_string()),
@@ -296,14 +369,25 @@ fn test_session_table_compact_headers() {
     assert!(result.contains("Segs"), "should contain Segs");
     assert!(result.contains("5h%"), "should contain 5h%");
     // Columns hidden in compact mode
-    assert!(!result.contains("API Time"), "compact should not have API Time");
+    assert!(
+        !result.contains("API Time"),
+        "compact should not have API Time"
+    );
     assert!(!result.contains("1w%"), "compact should not have 1w%");
 }
 
 #[test]
 fn test_session_table_duration_shown() {
     let sessions = vec![make_session_summary(
-        "abc123", "/home/user/foo/bar", 0.50, 3_600_000, 1_800_000, 100, 50, Some(75), 2,
+        "abc123",
+        "/home/user/foo/bar",
+        0.50,
+        3_600_000,
+        1_800_000,
+        100,
+        50,
+        Some(75),
+        2,
     )];
     let opts = SlFormatOptions {
         tz: Some("UTC".to_string()),
@@ -312,7 +396,10 @@ fn test_session_table_duration_shown() {
         color: false,
     };
     let result = format_sl_session_table(&sessions, &opts);
-    assert!(result.contains("1h 0m"), "should show duration formatted as hours and minutes");
+    assert!(
+        result.contains("1h 0m"),
+        "should show duration formatted as hours and minutes"
+    );
 }
 
 #[test]
@@ -327,7 +414,10 @@ fn test_session_table_lines_format() {
         color: false,
     };
     let result = format_sl_session_table(&sessions, &opts);
-    assert!(result.contains("+42 -17"), "should contain lines added/removed");
+    assert!(
+        result.contains("+42 -17"),
+        "should contain lines added/removed"
+    );
 }
 
 #[test]
@@ -367,7 +457,12 @@ fn test_session_table_segments_shown() {
 #[test]
 fn test_json_ratelimit_structure() {
     let entries = vec![make_ratelimit_entry(
-        1_774_483_200, "session-abc123", 30, 1_774_500_000, 50, 1_775_000_000,
+        1_774_483_200,
+        "session-abc123",
+        30,
+        1_774_500_000,
+        50,
+        1_775_000_000,
     )];
     let meta = make_json_meta("ratelimit");
     let result = format_sl_json_ratelimit(&entries, &meta);
@@ -392,8 +487,7 @@ fn test_json_ratelimit_meta_fields() {
         generated_at: "2026-03-26T00:00:00Z".to_string(),
     };
     let result = format_sl_json_ratelimit(&entries, &meta);
-    let parsed: serde_json::Value =
-        serde_json::from_str(&result).expect("valid JSON");
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
 
     assert_eq!(parsed["meta"]["source"], "my-source");
     assert_eq!(parsed["meta"]["file"], "my-file.jsonl");
@@ -410,8 +504,14 @@ fn test_json_ratelimit_null_from_to() {
     let meta = make_json_meta("ratelimit");
     let result = format_sl_json_ratelimit(&entries, &meta);
     let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
-    assert!(parsed["meta"]["from"].is_null(), "from should be null when not set");
-    assert!(parsed["meta"]["to"].is_null(), "to should be null when not set");
+    assert!(
+        parsed["meta"]["from"].is_null(),
+        "from should be null when not set"
+    );
+    assert!(
+        parsed["meta"]["to"].is_null(),
+        "to should be null when not set"
+    );
 }
 
 #[test]
@@ -451,9 +551,9 @@ fn test_json_sessions_totals_duration() {
 
 #[test]
 fn test_json_sessions_data_array() {
-    let sessions = vec![
-        make_session_summary("s1", "/proj/a", 0.5, 1_000, 500, 0, 0, None, 1),
-    ];
+    let sessions = vec![make_session_summary(
+        "s1", "/proj/a", 0.5, 1_000, 500, 0, 0, None, 1,
+    )];
     let meta = make_json_meta("sessions");
     let result = format_sl_json_sessions(&sessions, &meta);
     let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
@@ -550,7 +650,12 @@ fn test_csv_ratelimit_header_row() {
 #[test]
 fn test_csv_ratelimit_data_row() {
     let entries = vec![make_ratelimit_entry(
-        1_774_483_200, "session-abc123", 30, 1_774_500_000, 50, 1_775_000_000,
+        1_774_483_200,
+        "session-abc123",
+        30,
+        1_774_500_000,
+        50,
+        1_775_000_000,
     )];
     let result = format_sl_csv_ratelimit(&entries, Some("UTC"));
     let lines: Vec<&str> = result.lines().collect();
@@ -558,19 +663,30 @@ fn test_csv_ratelimit_data_row() {
     let data = lines[1];
     assert!(data.contains("30"), "should contain 5h%");
     assert!(data.contains("50"), "should contain 1w%");
-    assert!(data.contains("session-abc123"), "should contain full session id");
+    assert!(
+        data.contains("session-abc123"),
+        "should contain full session id"
+    );
 }
 
 #[test]
 fn test_csv_ratelimit_time_format() {
     // 2026-03-26T04:40:00Z
     let entries = vec![make_ratelimit_entry(
-        1_774_483_200, "s1", 30, 1_774_500_000, 50, 1_775_000_000,
+        1_774_483_200,
+        "s1",
+        30,
+        1_774_500_000,
+        50,
+        1_775_000_000,
     )];
     let result = format_sl_csv_ratelimit(&entries, Some("UTC"));
     let lines: Vec<&str> = result.lines().collect();
     // fmt_time gives "YYYY-MM-DD HH:MM"
-    assert!(lines[1].starts_with("2026-03-26"), "time column should start with date");
+    assert!(
+        lines[1].starts_with("2026-03-26"),
+        "time column should start with date"
+    );
 }
 
 #[test]
@@ -584,16 +700,33 @@ fn test_csv_sessions_header_row() {
     };
     let result = format_sl_csv_sessions(&sessions, &opts);
     let first_line = result.lines().next().expect("should have header line");
-    assert!(first_line.contains("Session"), "header should contain Session");
+    assert!(
+        first_line.contains("Session"),
+        "header should contain Session"
+    );
     assert!(first_line.contains("Cost"), "header should contain Cost");
-    assert!(first_line.contains("API Time"), "header should contain API Time");
-    assert!(first_line.contains("Lines Added"), "header should contain Lines Added");
+    assert!(
+        first_line.contains("API Time"),
+        "header should contain API Time"
+    );
+    assert!(
+        first_line.contains("Lines Added"),
+        "header should contain Lines Added"
+    );
 }
 
 #[test]
 fn test_csv_sessions_data_row() {
     let sessions = vec![make_session_summary(
-        "session-xyz", "/proj/a", 1.234567, 3_600_000, 1_800_000, 42, 17, Some(60), 2,
+        "session-xyz",
+        "/proj/a",
+        1.234567,
+        3_600_000,
+        1_800_000,
+        42,
+        17,
+        Some(60),
+        2,
     )];
     let opts = SlFormatOptions {
         tz: Some("UTC".to_string()),
@@ -610,6 +743,8 @@ fn test_csv_sessions_data_row() {
     assert!(data.contains("42"), "should contain lines_added");
     assert!(data.contains("17"), "should contain lines_removed");
     assert!(data.contains("60"), "should contain ctx_pct");
-    assert!(data.contains('2'.to_string().as_str()), "should contain segments");
+    assert!(
+        data.contains('2'.to_string().as_str()),
+        "should contain segments"
+    );
 }
-

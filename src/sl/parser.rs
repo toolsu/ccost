@@ -1,6 +1,6 @@
-use std::fs;
 use chrono::{DateTime, Local, TimeZone, Utc};
 use serde::Deserialize;
+use std::fs;
 
 use super::types::{SlLoadOptions, SlRecord};
 
@@ -118,7 +118,11 @@ fn format_in_tz(dt: &DateTime<Utc>, tz: &ResolvedTz) -> String {
 }
 
 fn get_date_part(s: &str) -> &str {
-    if s.len() >= 10 { &s[..10] } else { s }
+    if s.len() >= 10 {
+        &s[..10]
+    } else {
+        s
+    }
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────
@@ -139,8 +143,14 @@ pub fn load_sl_records(file_path: &str, opts: &SlLoadOptions) -> (Vec<SlRecord>,
     // Normalize and precompute filter values
     let from_normalized = opts.from.as_ref().map(|s| s.replace(' ', "T"));
     let to_normalized = opts.to.as_ref().map(|s| s.replace(' ', "T"));
-    let from_is_date_only = from_normalized.as_ref().map(|s| s.len() == 10).unwrap_or(false);
-    let to_is_date_only = to_normalized.as_ref().map(|s| s.len() == 10).unwrap_or(false);
+    let from_is_date_only = from_normalized
+        .as_ref()
+        .map(|s| s.len() == 10)
+        .unwrap_or(false);
+    let to_is_date_only = to_normalized
+        .as_ref()
+        .map(|s| s.len() == 10)
+        .unwrap_or(false);
     let needs_date_filter = from_normalized.is_some() || to_normalized.is_some();
 
     let session_lower = opts.session.as_ref().map(|s| s.to_lowercase());
@@ -177,13 +187,21 @@ pub fn load_sl_records(file_path: &str, opts: &SlLoadOptions) -> (Vec<SlRecord>,
         if needs_date_filter {
             let formatted = format_in_tz(&ts, &resolved_tz);
             if let Some(ref from_val) = from_normalized {
-                let cmp = if from_is_date_only { get_date_part(&formatted) } else { &formatted };
+                let cmp = if from_is_date_only {
+                    get_date_part(&formatted)
+                } else {
+                    &formatted
+                };
                 if cmp < from_val.as_str() {
                     continue;
                 }
             }
             if let Some(ref to_val) = to_normalized {
-                let cmp = if to_is_date_only { get_date_part(&formatted) } else { &formatted };
+                let cmp = if to_is_date_only {
+                    get_date_part(&formatted)
+                } else {
+                    &formatted
+                };
                 if cmp > to_val.as_str() {
                     continue;
                 }
@@ -218,12 +236,24 @@ pub fn load_sl_records(file_path: &str, opts: &SlLoadOptions) -> (Vec<SlRecord>,
         let (five_hour_pct, five_hour_resets_at, seven_day_pct, seven_day_resets_at) =
             match &d.rate_limits {
                 Some(rl) => {
-                    let fh_pct = rl.five_hour.as_ref().and_then(|w| w.used_percentage).map(|v| v.round() as u8);
-                    let fh_resets = rl.five_hour.as_ref()
+                    let fh_pct = rl
+                        .five_hour
+                        .as_ref()
+                        .and_then(|w| w.used_percentage)
+                        .map(|v| v.round() as u8);
+                    let fh_resets = rl
+                        .five_hour
+                        .as_ref()
                         .and_then(|w| w.resets_at)
                         .and_then(|secs| Utc.timestamp_opt(secs, 0).single());
-                    let sd_pct = rl.seven_day.as_ref().and_then(|w| w.used_percentage).map(|v| v.round() as u8);
-                    let sd_resets = rl.seven_day.as_ref()
+                    let sd_pct = rl
+                        .seven_day
+                        .as_ref()
+                        .and_then(|w| w.used_percentage)
+                        .map(|v| v.round() as u8);
+                    let sd_resets = rl
+                        .seven_day
+                        .as_ref()
                         .and_then(|w| w.resets_at)
                         .and_then(|secs| Utc.timestamp_opt(secs, 0).single());
                     (fh_pct, fh_resets, sd_pct, sd_resets)

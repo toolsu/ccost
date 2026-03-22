@@ -4,8 +4,8 @@ use chrono::{DateTime, Local, Utc};
 use serde_json;
 
 use super::types::*;
-use crate::types::PriceMode;
 use crate::formatters::table::format_cost;
+use crate::types::PriceMode;
 
 // ─── Public option structs ────────────────────────────────────────────────────
 
@@ -108,10 +108,7 @@ pub fn fmt_duration(ms: u64) -> String {
 /// Shorten a project path to last 2 path components with ".../" prefix.
 /// e.g. "/home/user/projects/foo/bar" → ".../foo/bar"
 pub fn shorten_project(path: &str) -> String {
-    let components: Vec<&str> = path
-        .split('/')
-        .filter(|s| !s.is_empty())
-        .collect();
+    let components: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
 
     if components.len() <= 2 {
         path.to_string()
@@ -146,7 +143,9 @@ fn display_width(s: &str) -> usize {
 fn render_row(output: &mut String, row: &[String], col_widths: &[usize], num_cols: usize) {
     output.push('\u{2502}');
     for (i, cell) in row.iter().enumerate() {
-        if i >= num_cols { break; }
+        if i >= num_cols {
+            break;
+        }
         if i == 0 {
             output.push(' ');
             output.push_str(cell);
@@ -180,7 +179,9 @@ pub fn render_table_with_totals(
         for (i, cell) in row.iter().enumerate() {
             if i < num_cols {
                 let w = display_width(cell);
-                if w > col_widths[i] { col_widths[i] = w; }
+                if w > col_widths[i] {
+                    col_widths[i] = w;
+                }
             }
         }
     }
@@ -188,7 +189,9 @@ pub fn render_table_with_totals(
         for (i, cell) in t.iter().enumerate() {
             if i < num_cols {
                 let w = display_width(cell);
-                if w > col_widths[i] { col_widths[i] = w; }
+                if w > col_widths[i] {
+                    col_widths[i] = w;
+                }
             }
         }
     }
@@ -199,7 +202,9 @@ pub fn render_table_with_totals(
     output.push('\u{250C}');
     for (i, &w) in col_widths.iter().enumerate() {
         output.push_str(&"\u{2500}".repeat(w + 2));
-        if i < num_cols - 1 { output.push('\u{252C}'); }
+        if i < num_cols - 1 {
+            output.push('\u{252C}');
+        }
     }
     output.push('\u{2510}');
     output.push('\n');
@@ -228,7 +233,9 @@ pub fn render_table_with_totals(
         let yellow_end = if color { "\x1b[0m" } else { "" };
         output.push('\u{2502}');
         for (i, cell) in t.iter().enumerate() {
-            if i >= num_cols { break; }
+            if i >= num_cols {
+                break;
+            }
             if i == 0 {
                 output.push(' ');
                 output.push_str(yellow_start);
@@ -251,7 +258,9 @@ pub fn render_table_with_totals(
     output.push('\u{2514}');
     for (i, &w) in col_widths.iter().enumerate() {
         output.push_str(&"\u{2500}".repeat(w + 2));
-        if i < num_cols - 1 { output.push('\u{2534}'); }
+        if i < num_cols - 1 {
+            output.push('\u{2534}');
+        }
     }
     output.push('\u{2518}');
     output.push('\n');
@@ -284,9 +293,22 @@ pub fn format_sl_ratelimit_table(entries: &[SlRateLimitEntry], opts: &SlFormatOp
     let tz = opts.tz.as_deref();
 
     let headers: Vec<String> = if opts.compact {
-        vec!["Time".to_string(), "Cost".to_string(), "5h%".to_string(), "1w%".to_string(), "5h Resets".to_string()]
+        vec![
+            "Time".to_string(),
+            "Cost".to_string(),
+            "5h%".to_string(),
+            "1w%".to_string(),
+            "5h Resets".to_string(),
+        ]
     } else {
-        vec!["Time".to_string(), "Cost".to_string(), "5h%".to_string(), "1w%".to_string(), "5h Resets".to_string(), "Session".to_string()]
+        vec![
+            "Time".to_string(),
+            "Cost".to_string(),
+            "5h%".to_string(),
+            "1w%".to_string(),
+            "5h Resets".to_string(),
+            "Session".to_string(),
+        ]
     };
 
     let rows: Vec<Vec<String>> = entries
@@ -333,8 +355,17 @@ pub fn format_sl_ratelimit_table(entries: &[SlRateLimitEntry], opts: &SlFormatOp
 ///
 /// Full:    [Label] | Cost | Duration | API Time | Lines +/- | [count_label] | 5h% | 1w% | [extra_header]
 /// Compact: [Label] | Cost | Duration | [count_label] | 5h%
-fn unified_headers(label: &str, count_label: &str, compact: bool, extra_header: Option<&str>) -> Vec<String> {
-    let mut headers = vec![label.to_string(), "Cost".to_string(), "Duration".to_string()];
+fn unified_headers(
+    label: &str,
+    count_label: &str,
+    compact: bool,
+    extra_header: Option<&str>,
+) -> Vec<String> {
+    let mut headers = vec![
+        label.to_string(),
+        "Cost".to_string(),
+        "Duration".to_string(),
+    ];
     if compact {
         headers.push(count_label.to_string());
         headers.push("5h%".to_string());
@@ -469,10 +500,21 @@ pub fn format_sl_session_table(sessions: &[SlSessionSummary], opts: &SlFormatOpt
     let min_7d = sessions.iter().filter_map(|s| s.min_seven_day_pct).min();
     let max_7d = sessions.iter().filter_map(|s| s.max_seven_day_pct).max();
     let totals = build_unified_row(
-        "TOTAL".to_string(), total_cost, total_dur, total_api,
-        total_added, total_removed, total_segs,
-        min_5h, max_5h, min_7d, max_7d,
-        opts.price_mode, opts.compact, None, opts.color,
+        "TOTAL".to_string(),
+        total_cost,
+        total_dur,
+        total_api,
+        total_added,
+        total_removed,
+        total_segs,
+        min_5h,
+        max_5h,
+        min_7d,
+        max_7d,
+        opts.price_mode,
+        opts.compact,
+        None,
+        opts.color,
     );
 
     render_table_with_totals(&headers, &rows, Some(&totals), opts.color)
@@ -518,10 +560,21 @@ pub fn format_sl_project_table(projects: &[SlProjectSummary], opts: &SlFormatOpt
     let min_7d = projects.iter().filter_map(|p| p.min_seven_day_pct).min();
     let max_7d = projects.iter().filter_map(|p| p.max_seven_day_pct).max();
     let totals = build_unified_row(
-        "TOTAL".to_string(), total_cost, total_dur, total_api,
-        total_added, total_removed, total_sess,
-        min_5h, max_5h, min_7d, max_7d,
-        opts.price_mode, opts.compact, None, opts.color,
+        "TOTAL".to_string(),
+        total_cost,
+        total_dur,
+        total_api,
+        total_added,
+        total_removed,
+        total_sess,
+        min_5h,
+        max_5h,
+        min_7d,
+        max_7d,
+        opts.price_mode,
+        opts.compact,
+        None,
+        opts.color,
     );
 
     render_table_with_totals(&headers, &rows, Some(&totals), opts.color)
@@ -566,10 +619,21 @@ pub fn format_sl_day_table(days: &[SlDaySummary], opts: &SlFormatOptions) -> Str
     let min_7d = days.iter().filter_map(|d| d.min_seven_day_pct).min();
     let max_7d = days.iter().filter_map(|d| d.max_seven_day_pct).max();
     let mut totals = build_unified_row(
-        "TOTAL".to_string(), total_cost, total_dur, total_api,
-        total_added, total_removed, 0,
-        min_5h, max_5h, min_7d, max_7d,
-        opts.price_mode, opts.compact, None, opts.color,
+        "TOTAL".to_string(),
+        total_cost,
+        total_dur,
+        total_api,
+        total_added,
+        total_removed,
+        0,
+        min_5h,
+        max_5h,
+        min_7d,
+        max_7d,
+        opts.price_mode,
+        opts.compact,
+        None,
+        opts.color,
     );
     // Replace Sess count with "—" (sessions may span days)
     let sess_idx = if opts.compact { 3 } else { 5 };
@@ -664,10 +728,19 @@ pub fn format_sl_window_table(
         Some("\u{2014}".to_string()) // Est Budget N/A
     };
     let mut totals = build_unified_row(
-        "TOTAL".to_string(), total_cost, total_dur, total_api,
-        total_added, total_removed, 0,
-        min_5h, max_5h, min_7d, max_7d,
-        opts.price_mode, opts.compact,
+        "TOTAL".to_string(),
+        total_cost,
+        total_dur,
+        total_api,
+        total_added,
+        total_removed,
+        0,
+        min_5h,
+        max_5h,
+        min_7d,
+        max_7d,
+        opts.price_mode,
+        opts.compact,
         extra_totals,
         opts.color,
     );
@@ -740,7 +813,40 @@ pub fn format_sl_cost_diff_table(
         })
         .collect();
 
-    render_table(&headers, &rows, opts.color)
+    let total_sl: f64 = diffs.iter().map(|d| d.sl_cost).sum();
+    let total_litellm: f64 = diffs.iter().filter_map(|d| d.litellm_cost).sum();
+    let has_litellm = diffs.iter().any(|d| d.litellm_cost.is_some());
+    let total_diff = if has_litellm {
+        Some(total_sl - total_litellm)
+    } else {
+        None
+    };
+    let total_diff_pct = if has_litellm && total_litellm > 0.0 {
+        Some((total_sl - total_litellm) / total_litellm * 100.0)
+    } else {
+        None
+    };
+
+    let totals = vec![
+        "TOTAL".to_string(),
+        String::new(),
+        format_cost(total_sl, opts.price_mode),
+        if has_litellm {
+            format_cost(total_litellm, opts.price_mode)
+        } else {
+            "\u{2014}".to_string()
+        },
+        match total_diff {
+            Some(d) => format_cost(d, opts.price_mode),
+            None => "\u{2014}".to_string(),
+        },
+        match total_diff_pct {
+            Some(p) => format!("{:.1}%", p),
+            None => "\u{2014}".to_string(),
+        },
+    ];
+
+    render_table_with_totals(&headers, &rows, Some(&totals), opts.color)
 }
 
 // ─── JSON formatters ──────────────────────────────────────────────────────────
@@ -818,6 +924,26 @@ pub fn format_sl_json_days(days: &[SlDaySummary], meta: &SlJsonMeta) -> String {
     serde_json::to_string_pretty(&output).unwrap_or_else(|_| "{}".to_string())
 }
 
+/// Format cost-diff data as JSON with meta/data structure.
+pub fn format_sl_json_cost_diff(diffs: &[SlCostDiff], meta: &SlJsonMeta) -> String {
+    let total_sl: f64 = diffs.iter().map(|d| d.sl_cost).sum();
+    let total_litellm: f64 = diffs.iter().filter_map(|d| d.litellm_cost).sum();
+    let has_litellm = diffs.iter().any(|d| d.litellm_cost.is_some());
+
+    let totals = serde_json::json!({
+        "totalSlCost": total_sl,
+        "totalLitellmCost": if has_litellm { Some(total_litellm) } else { None },
+        "count": diffs.len(),
+    });
+
+    let output = serde_json::json!({
+        "meta": meta_to_json(meta),
+        "data": diffs,
+        "totals": totals,
+    });
+    serde_json::to_string_pretty(&output).unwrap_or_else(|_| "{}".to_string())
+}
+
 // ─── CSV formatters ───────────────────────────────────────────────────────────
 
 fn csv_escape(field: &str) -> String {
@@ -830,7 +956,11 @@ fn csv_escape(field: &str) -> String {
 }
 
 fn csv_row(fields: &[String]) -> String {
-    fields.iter().map(|f| csv_escape(f)).collect::<Vec<_>>().join(",")
+    fields
+        .iter()
+        .map(|f| csv_escape(f))
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 /// Format rate-limit entries as CSV.
@@ -862,7 +992,9 @@ pub fn format_sl_csv_sessions(sessions: &[SlSessionSummary], opts: &SlFormatOpti
     let mut output = String::new();
 
     // Header
-    output.push_str("Session,Project,Cost,Duration,API Time,Lines Added,Lines Removed,Ctx%,Segments\n");
+    output.push_str(
+        "Session,Project,Cost,Duration,API Time,Lines Added,Lines Removed,Ctx%,Segments\n",
+    );
 
     for s in sessions {
         let ctx_pct = match s.max_context_pct {
@@ -896,7 +1028,9 @@ fn strip_ansi(s: &str) -> String {
     let mut in_escape = false;
     for ch in s.chars() {
         if in_escape {
-            if ch == 'm' { in_escape = false; }
+            if ch == 'm' {
+                in_escape = false;
+            }
         } else if ch == '\x1b' {
             in_escape = true;
         } else {
@@ -907,29 +1041,42 @@ fn strip_ansi(s: &str) -> String {
 }
 
 /// Render headers + rows + optional totals as a Markdown table.
-pub fn render_markdown(headers: &[String], rows: &[Vec<String>], totals: Option<&Vec<String>>) -> String {
+pub fn render_markdown(
+    headers: &[String],
+    rows: &[Vec<String>],
+    totals: Option<&Vec<String>>,
+) -> String {
     let mut out = String::new();
     // Header
     out.push('|');
-    for h in headers { out.push_str(&format!(" {} |", h)); }
+    for h in headers {
+        out.push_str(&format!(" {} |", h));
+    }
     out.push('\n');
     // Separator (first col left-aligned, rest right-aligned)
     out.push('|');
     for (i, _) in headers.iter().enumerate() {
-        if i == 0 { out.push_str(" :--- |"); }
-        else { out.push_str(" ---: |"); }
+        if i == 0 {
+            out.push_str(" :--- |");
+        } else {
+            out.push_str(" ---: |");
+        }
     }
     out.push('\n');
     // Data rows
     for row in rows {
         out.push('|');
-        for cell in row { out.push_str(&format!(" {} |", strip_ansi(cell))); }
+        for cell in row {
+            out.push_str(&format!(" {} |", strip_ansi(cell)));
+        }
         out.push('\n');
     }
     // Totals
     if let Some(t) = totals {
         out.push('|');
-        for cell in t { out.push_str(&format!(" **{}** |", strip_ansi(cell))); }
+        for cell in t {
+            out.push_str(&format!(" **{}** |", strip_ansi(cell)));
+        }
         out.push('\n');
     }
     out
@@ -944,7 +1091,11 @@ fn html_escape(s: &str) -> String {
 }
 
 /// Render headers + rows + optional totals as a full HTML page using the ccost template.
-pub fn render_html(headers: &[String], rows: &[Vec<String>], totals: Option<&Vec<String>>) -> String {
+pub fn render_html(
+    headers: &[String],
+    rows: &[Vec<String>],
+    totals: Option<&Vec<String>>,
+) -> String {
     let title = "ccost report";
     let num_cols = headers.len();
     let mut html = String::new();
@@ -1149,21 +1300,86 @@ fn build_sl_js(_num_cols: usize) -> String {
 }
 
 /// Render headers + rows + optional totals as TSV.
-pub fn render_tsv(headers: &[String], rows: &[Vec<String>], totals: Option<&Vec<String>>) -> String {
+pub fn render_tsv(
+    headers: &[String],
+    rows: &[Vec<String>],
+    totals: Option<&Vec<String>>,
+) -> String {
+    render_dsv(headers, rows, totals, "\t")
+}
+
+/// Render headers + rows + optional totals as CSV.
+pub fn render_csv(
+    headers: &[String],
+    rows: &[Vec<String>],
+    totals: Option<&Vec<String>>,
+) -> String {
+    render_dsv(headers, rows, totals, ",")
+}
+
+/// Render as delimiter-separated values (shared by CSV and TSV).
+fn render_dsv(
+    headers: &[String],
+    rows: &[Vec<String>],
+    totals: Option<&Vec<String>>,
+    sep: &str,
+) -> String {
+    let escape = |s: &str| -> String {
+        let clean = strip_ansi(s);
+        if clean.contains(',')
+            || clean.contains('"')
+            || clean.contains('\n')
+            || clean.contains('\t')
+        {
+            format!("\"{}\"", clean.replace('"', "\"\""))
+        } else {
+            clean
+        }
+    };
     let mut out = String::new();
-    out.push_str(&headers.join("\t"));
+    out.push_str(
+        &headers
+            .iter()
+            .map(|h| escape(h))
+            .collect::<Vec<_>>()
+            .join(sep),
+    );
     out.push('\n');
     for row in rows {
-        let clean: Vec<String> = row.iter().map(|c| strip_ansi(c)).collect();
-        out.push_str(&clean.join("\t"));
+        out.push_str(&row.iter().map(|c| escape(c)).collect::<Vec<_>>().join(sep));
         out.push('\n');
     }
     if let Some(t) = totals {
-        let clean: Vec<String> = t.iter().map(|c| strip_ansi(c)).collect();
-        out.push_str(&clean.join("\t"));
+        out.push_str(&t.iter().map(|c| escape(c)).collect::<Vec<_>>().join(sep));
         out.push('\n');
     }
     out
+}
+
+/// Render headers + rows + optional totals as a simple JSON array.
+pub fn render_json(
+    headers: &[String],
+    rows: &[Vec<String>],
+    totals: Option<&Vec<String>>,
+) -> String {
+    let mut items: Vec<serde_json::Value> = Vec::new();
+    for row in rows {
+        let mut obj = serde_json::Map::new();
+        for (i, cell) in row.iter().enumerate() {
+            let key = headers.get(i).cloned().unwrap_or_default();
+            obj.insert(key, serde_json::Value::String(strip_ansi(cell)));
+        }
+        items.push(serde_json::Value::Object(obj));
+    }
+    if let Some(t) = totals {
+        let mut obj = serde_json::Map::new();
+        for (i, cell) in t.iter().enumerate() {
+            let key = headers.get(i).cloned().unwrap_or_default();
+            obj.insert(key, serde_json::Value::String(strip_ansi(cell)));
+        }
+        items.push(serde_json::Value::Object(obj));
+    }
+    serde_json::to_string_pretty(&items).unwrap_or_else(|_| "[]".to_string())
 }
 
 #[cfg(test)]
@@ -1184,9 +1400,15 @@ mod tests {
             session_id: session_id.to_string(),
             cost_delta: 0.0,
             five_hour_pct,
-            five_hour_resets_at: Utc.timestamp_opt(five_hour_resets_secs, 0).single().unwrap(),
+            five_hour_resets_at: Utc
+                .timestamp_opt(five_hour_resets_secs, 0)
+                .single()
+                .unwrap(),
             seven_day_pct,
-            seven_day_resets_at: Utc.timestamp_opt(seven_day_resets_secs, 0).single().unwrap(),
+            seven_day_resets_at: Utc
+                .timestamp_opt(seven_day_resets_secs, 0)
+                .single()
+                .unwrap(),
         }
     }
 
@@ -1247,8 +1469,14 @@ mod tests {
     #[test]
     fn test_fmt_lines_colored_nonzero() {
         let result = fmt_lines(100, 50, true);
-        assert!(result.contains("\x1b[32m+100\x1b[0m"), "added should be green");
-        assert!(result.contains("\x1b[31m-50\x1b[0m"), "removed should be red");
+        assert!(
+            result.contains("\x1b[32m+100\x1b[0m"),
+            "added should be green"
+        );
+        assert!(
+            result.contains("\x1b[31m-50\x1b[0m"),
+            "removed should be red"
+        );
     }
 
     #[test]
@@ -1256,34 +1484,49 @@ mod tests {
         let result = fmt_lines(0, 0, true);
         // +0 and -0 should NOT have color codes
         assert_eq!(result, "+0 -0");
-        assert!(!result.contains("\x1b["), "zero values should not have ANSI codes");
+        assert!(
+            !result.contains("\x1b["),
+            "zero values should not have ANSI codes"
+        );
     }
 
     #[test]
     fn test_fmt_lines_mixed_zero_nonzero() {
         let result = fmt_lines(42, 0, true);
-        assert!(result.contains("\x1b[32m+42\x1b[0m"), "nonzero added should be green");
+        assert!(
+            result.contains("\x1b[32m+42\x1b[0m"),
+            "nonzero added should be green"
+        );
         assert!(result.contains(" -0"), "zero removed should be plain");
-        assert!(!result.contains("\x1b[31m"), "zero removed should not be red");
+        assert!(
+            !result.contains("\x1b[31m"),
+            "zero removed should not be red"
+        );
 
         let result2 = fmt_lines(0, 7, true);
         assert!(result2.contains("+0 "), "zero added should be plain");
-        assert!(result2.contains("\x1b[31m-7\x1b[0m"), "nonzero removed should be red");
+        assert!(
+            result2.contains("\x1b[31m-7\x1b[0m"),
+            "nonzero removed should be red"
+        );
     }
 
     #[test]
     fn test_fmt_lines_no_color_flag() {
         let result = fmt_lines(100, 50, false);
         assert_eq!(result, "+100 -50");
-        assert!(!result.contains("\x1b["), "color=false should have no ANSI codes");
+        assert!(
+            !result.contains("\x1b["),
+            "color=false should have no ANSI codes"
+        );
     }
 
     #[test]
     fn test_total_row_lines_colored() {
         // TOTAL row should have green/red lines when values are nonzero
-        let sessions = vec![
-            make_session_summary("s1", "/proj/a", 1.0, 1000, 500, 100, 50, None, 1),
-        ];
+        let sessions = vec![make_session_summary(
+            "s1", "/proj/a", 1.0, 1000, 500, 100, 50, None, 1,
+        )];
         let opts = SlFormatOptions {
             tz: Some("UTC".to_string()),
             price_mode: PriceMode::Decimal,
@@ -1292,16 +1535,22 @@ mod tests {
         };
         let result = format_sl_session_table(&sessions, &opts);
         // The TOTAL row should contain green +100 and red -50
-        assert!(result.contains("\x1b[32m+100\x1b[0m"), "TOTAL should have green +lines");
-        assert!(result.contains("\x1b[31m-50\x1b[0m"), "TOTAL should have red -lines");
+        assert!(
+            result.contains("\x1b[32m+100\x1b[0m"),
+            "TOTAL should have green +lines"
+        );
+        assert!(
+            result.contains("\x1b[31m-50\x1b[0m"),
+            "TOTAL should have red -lines"
+        );
     }
 
     #[test]
     fn test_total_row_zero_lines_no_extra_color() {
         // TOTAL row with +0 -0 should not have green/red — stays yellow from row wrapper
-        let sessions = vec![
-            make_session_summary("s1", "/proj/a", 1.0, 1000, 500, 0, 0, None, 1),
-        ];
+        let sessions = vec![make_session_summary(
+            "s1", "/proj/a", 1.0, 1000, 500, 0, 0, None, 1,
+        )];
         let opts = SlFormatOptions {
             tz: Some("UTC".to_string()),
             price_mode: PriceMode::Decimal,
@@ -1312,13 +1561,22 @@ mod tests {
         // Find the TOTAL row line
         let total_line = result.lines().find(|l| l.contains("TOTAL")).unwrap();
         // Should contain +0 -0 wrapped in yellow only, no green/red
-        assert!(!total_line.contains("\x1b[32m+0"), "zero +lines should not be green in TOTAL");
-        assert!(!total_line.contains("\x1b[31m-0"), "zero -lines should not be red in TOTAL");
+        assert!(
+            !total_line.contains("\x1b[32m+0"),
+            "zero +lines should not be green in TOTAL"
+        );
+        assert!(
+            !total_line.contains("\x1b[31m-0"),
+            "zero -lines should not be red in TOTAL"
+        );
     }
 
     #[test]
     fn test_shorten_project_long() {
-        assert_eq!(shorten_project("/home/user/projects/foo/bar"), ".../foo/bar");
+        assert_eq!(
+            shorten_project("/home/user/projects/foo/bar"),
+            ".../foo/bar"
+        );
         assert_eq!(shorten_project("/a/b/c/d"), ".../c/d");
     }
 
@@ -1347,7 +1605,12 @@ mod tests {
     #[test]
     fn test_ratelimit_table_headers() {
         let entries = vec![make_ratelimit_entry(
-            1_774_483_200, "session-abc123", 30, 1_774_500_000, 50, 1_775_000_000
+            1_774_483_200,
+            "session-abc123",
+            30,
+            1_774_500_000,
+            50,
+            1_775_000_000,
         )];
         let opts = SlFormatOptions {
             tz: Some("UTC".to_string()),
@@ -1359,14 +1622,22 @@ mod tests {
         assert!(result.contains("Time"), "should contain Time header");
         assert!(result.contains("5h%"), "should contain 5h% header");
         assert!(result.contains("1w%"), "should contain 1w% header");
-        assert!(result.contains("5h Resets"), "should contain 5h Resets header");
+        assert!(
+            result.contains("5h Resets"),
+            "should contain 5h Resets header"
+        );
         assert!(result.contains("Session"), "should contain Session header");
     }
 
     #[test]
     fn test_ratelimit_table_compact_no_session() {
         let entries = vec![make_ratelimit_entry(
-            1_774_483_200, "session-abc123", 30, 1_774_500_000, 50, 1_775_000_000
+            1_774_483_200,
+            "session-abc123",
+            30,
+            1_774_500_000,
+            50,
+            1_775_000_000,
         )];
         let opts = SlFormatOptions {
             tz: Some("UTC".to_string()),
@@ -1376,13 +1647,21 @@ mod tests {
         };
         let result = format_sl_ratelimit_table(&entries, &opts);
         assert!(result.contains("5h%"), "should contain 5h% header");
-        assert!(!result.contains("Session"), "compact should hide Session column");
+        assert!(
+            !result.contains("Session"),
+            "compact should hide Session column"
+        );
     }
 
     #[test]
     fn test_ratelimit_table_values() {
         let entries = vec![make_ratelimit_entry(
-            1_774_483_200, "session-abc123", 45, 1_774_500_000, 72, 1_775_000_000
+            1_774_483_200,
+            "session-abc123",
+            45,
+            1_774_500_000,
+            72,
+            1_775_000_000,
         )];
         let opts = SlFormatOptions {
             tz: Some("UTC".to_string()),
@@ -1394,13 +1673,24 @@ mod tests {
         assert!(result.contains("45%"), "should contain 45%");
         assert!(result.contains("72%"), "should contain 72%");
         // Session truncated to 8 chars: "session-"
-        assert!(result.contains("session-"), "should contain first 8 chars of session_id");
+        assert!(
+            result.contains("session-"),
+            "should contain first 8 chars of session_id"
+        );
     }
 
     #[test]
     fn test_session_table_full_headers() {
         let sessions = vec![make_session_summary(
-            "abc123", "/home/user/foo/bar", 0.50, 3600_000, 1800_000, 100, 50, Some(75), 2
+            "abc123",
+            "/home/user/foo/bar",
+            0.50,
+            3600_000,
+            1800_000,
+            100,
+            50,
+            Some(75),
+            2,
         )];
         let opts = SlFormatOptions {
             tz: Some("UTC".to_string()),
@@ -1411,9 +1701,18 @@ mod tests {
         let result = format_sl_session_table(&sessions, &opts);
         assert!(result.contains("Session"), "should contain Session header");
         assert!(result.contains("Cost"), "should contain Cost header");
-        assert!(result.contains("Duration"), "should contain Duration header");
-        assert!(result.contains("API Time"), "should contain API Time header");
-        assert!(result.contains("Lines +/-"), "should contain Lines +/- header");
+        assert!(
+            result.contains("Duration"),
+            "should contain Duration header"
+        );
+        assert!(
+            result.contains("API Time"),
+            "should contain API Time header"
+        );
+        assert!(
+            result.contains("Lines +/-"),
+            "should contain Lines +/- header"
+        );
         assert!(result.contains("Segs"), "should contain Segs header");
         assert!(result.contains("5h%"), "should contain 5h% header");
         assert!(result.contains("1w%"), "should contain 1w% header");
@@ -1422,7 +1721,15 @@ mod tests {
     #[test]
     fn test_session_table_compact_headers() {
         let sessions = vec![make_session_summary(
-            "abc123", "/home/user/foo/bar", 0.50, 3600_000, 1800_000, 100, 50, Some(75), 2
+            "abc123",
+            "/home/user/foo/bar",
+            0.50,
+            3600_000,
+            1800_000,
+            100,
+            50,
+            Some(75),
+            2,
         )];
         let opts = SlFormatOptions {
             tz: Some("UTC".to_string()),
@@ -1435,14 +1742,22 @@ mod tests {
         assert!(result.contains("Cost"), "should contain Cost header");
         assert!(result.contains("Segs"), "should contain Segs header");
         assert!(result.contains("5h%"), "should contain 5h% header");
-        assert!(!result.contains("API Time"), "compact should not contain API Time");
+        assert!(
+            !result.contains("API Time"),
+            "compact should not contain API Time"
+        );
         assert!(!result.contains("1w%"), "compact should not contain 1w%");
     }
 
     #[test]
     fn test_json_ratelimit_structure() {
         let entries = vec![make_ratelimit_entry(
-            1_774_483_200, "session-abc123", 30, 1_774_500_000, 50, 1_775_000_000
+            1_774_483_200,
+            "session-abc123",
+            30,
+            1_774_500_000,
+            50,
+            1_775_000_000,
         )];
         let meta = SlJsonMeta {
             source: "test".to_string(),
@@ -1454,7 +1769,8 @@ mod tests {
             generated_at: "2026-03-26T00:00:00Z".to_string(),
         };
         let result = format_sl_json_ratelimit(&entries, &meta);
-        let parsed: serde_json::Value = serde_json::from_str(&result).expect("should be valid JSON");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&result).expect("should be valid JSON");
         assert!(parsed["meta"].is_object(), "should have meta object");
         assert!(parsed["data"].is_array(), "should have data array");
         assert_eq!(parsed["data"].as_array().unwrap().len(), 1);
@@ -1522,7 +1838,12 @@ mod tests {
     #[test]
     fn test_csv_ratelimit_headers() {
         let entries = vec![make_ratelimit_entry(
-            1_774_483_200, "session-abc123", 30, 1_774_500_000, 50, 1_775_000_000
+            1_774_483_200,
+            "session-abc123",
+            30,
+            1_774_500_000,
+            50,
+            1_775_000_000,
         )];
         let result = format_sl_csv_ratelimit(&entries, Some("UTC"));
         let first_line = result.lines().next().unwrap();
@@ -1532,20 +1853,36 @@ mod tests {
     #[test]
     fn test_csv_ratelimit_values() {
         let entries = vec![make_ratelimit_entry(
-            1_774_483_200, "session-abc123", 30, 1_774_500_000, 50, 1_775_000_000
+            1_774_483_200,
+            "session-abc123",
+            30,
+            1_774_500_000,
+            50,
+            1_775_000_000,
         )];
         let result = format_sl_csv_ratelimit(&entries, Some("UTC"));
         let lines: Vec<&str> = result.lines().collect();
         assert_eq!(lines.len(), 2); // header + 1 data row
         assert!(lines[1].contains("30"), "should contain 5h%");
         assert!(lines[1].contains("50"), "should contain 1w%");
-        assert!(lines[1].contains("session-abc123"), "should contain full session id");
+        assert!(
+            lines[1].contains("session-abc123"),
+            "should contain full session id"
+        );
     }
 
     #[test]
     fn test_csv_sessions_headers() {
         let sessions = vec![make_session_summary(
-            "abc123", "/proj/a", 0.5, 3600_000, 1800_000, 10, 5, Some(50), 1
+            "abc123",
+            "/proj/a",
+            0.5,
+            3600_000,
+            1800_000,
+            10,
+            5,
+            Some(50),
+            1,
         )];
         let opts = SlFormatOptions {
             tz: Some("UTC".to_string()),
@@ -1555,8 +1892,14 @@ mod tests {
         };
         let result = format_sl_csv_sessions(&sessions, &opts);
         let first_line = result.lines().next().unwrap();
-        assert!(first_line.contains("Session"), "header should contain Session");
+        assert!(
+            first_line.contains("Session"),
+            "header should contain Session"
+        );
         assert!(first_line.contains("Cost"), "header should contain Cost");
-        assert!(first_line.contains("API Time"), "header should contain API Time");
+        assert!(
+            first_line.contains("API Time"),
+            "header should contain API Time"
+        );
     }
 }

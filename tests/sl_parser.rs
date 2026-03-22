@@ -1,4 +1,4 @@
-use ccost::sl::{SlLoadOptions, load_sl_records};
+use ccost::sl::{load_sl_records, SlLoadOptions};
 use std::io::Write;
 use tempfile::NamedTempFile;
 
@@ -42,7 +42,12 @@ fn entry_no_rate_limits(ts: i64, session_id: &str, project_dir: &str, model_id: 
 #[test]
 fn test_basic_record_parsing() {
     // ts 1774481258 = 2026-03-26 (approx)
-    let line = full_entry(1774481258, "sess-abc", "/home/user/project", "claude-sonnet-4-5");
+    let line = full_entry(
+        1774481258,
+        "sess-abc",
+        "/home/user/project",
+        "claude-sonnet-4-5",
+    );
     let f = write_jsonl(&[&line]);
     let opts = SlLoadOptions::default();
     let (records, skipped) = load_sl_records(f.path().to_str().unwrap(), &opts);
@@ -136,9 +141,9 @@ fn test_malformed_lines_skipped() {
     let lines = vec![
         good.as_str(),
         "not valid json",
-        r#"{"ts": 123}"#,                    // missing data
-        r#"{"data": {}}"#,                    // missing ts
-        "",                                    // empty line (not counted as skipped)
+        r#"{"ts": 123}"#,                                     // missing data
+        r#"{"data": {}}"#,                                    // missing ts
+        "",                                                   // empty line (not counted as skipped)
         r#"{"ts": 1774481258, "data": {"session_id": "x"}}"#, // missing required data fields
     ];
     let f = write_jsonl(&lines);
@@ -186,7 +191,9 @@ fn test_session_filter_case_insensitive() {
     let (records, _) = load_sl_records(f.path().to_str().unwrap(), &opts);
 
     assert_eq!(records.len(), 2);
-    assert!(records.iter().all(|r| r.session_id.to_lowercase().contains("abcdef")));
+    assert!(records
+        .iter()
+        .all(|r| r.session_id.to_lowercase().contains("abcdef")));
 }
 
 #[test]
@@ -206,9 +213,24 @@ fn test_session_filter_no_match() {
 #[test]
 fn test_project_filter_case_insensitive() {
     let lines = vec![
-        full_entry(1774481258, "sess-1", "/home/user/MyProject", "claude-sonnet-4-5"),
-        full_entry(1774481300, "sess-2", "/home/user/other", "claude-sonnet-4-5"),
-        full_entry(1774481400, "sess-3", "/home/user/myproject-fork", "claude-sonnet-4-5"),
+        full_entry(
+            1774481258,
+            "sess-1",
+            "/home/user/MyProject",
+            "claude-sonnet-4-5",
+        ),
+        full_entry(
+            1774481300,
+            "sess-2",
+            "/home/user/other",
+            "claude-sonnet-4-5",
+        ),
+        full_entry(
+            1774481400,
+            "sess-3",
+            "/home/user/myproject-fork",
+            "claude-sonnet-4-5",
+        ),
     ];
     let line_refs: Vec<&str> = lines.iter().map(|s| s.as_str()).collect();
     let f = write_jsonl(&line_refs);
@@ -228,9 +250,27 @@ fn test_project_filter_case_insensitive() {
 fn test_model_filter_matches_model_id() {
     // Use distinct display_names so "sonnet" only appears in one entry
     let lines = vec![
-        full_entry_with_display(1774481258, "sess-1", "/proj/a", "claude-sonnet-4-5", "Claude Sonnet"),
-        full_entry_with_display(1774481300, "sess-2", "/proj/b", "claude-opus-4", "Claude Opus"),
-        full_entry_with_display(1774481400, "sess-3", "/proj/c", "claude-haiku-4", "Claude Haiku"),
+        full_entry_with_display(
+            1774481258,
+            "sess-1",
+            "/proj/a",
+            "claude-sonnet-4-5",
+            "Claude Sonnet",
+        ),
+        full_entry_with_display(
+            1774481300,
+            "sess-2",
+            "/proj/b",
+            "claude-opus-4",
+            "Claude Opus",
+        ),
+        full_entry_with_display(
+            1774481400,
+            "sess-3",
+            "/proj/c",
+            "claude-haiku-4",
+            "Claude Haiku",
+        ),
     ];
     let line_refs: Vec<&str> = lines.iter().map(|s| s.as_str()).collect();
     let f = write_jsonl(&line_refs);
@@ -250,8 +290,20 @@ fn test_model_filter_matches_display_name() {
     // entry_no_rate_limits uses "Claude Haiku" as display_name; the model_id does not contain "haiku"
     // Use a model_id that won't match on its own to confirm the display_name is also searched
     let lines = vec![
-        full_entry_with_display(1774481258, "sess-1", "/proj/a", "model-xyz-001", "Claude Haiku"),
-        full_entry_with_display(1774481300, "sess-2", "/proj/b", "model-xyz-002", "Claude Opus"),
+        full_entry_with_display(
+            1774481258,
+            "sess-1",
+            "/proj/a",
+            "model-xyz-001",
+            "Claude Haiku",
+        ),
+        full_entry_with_display(
+            1774481300,
+            "sess-2",
+            "/proj/b",
+            "model-xyz-002",
+            "Claude Opus",
+        ),
     ];
     let line_refs: Vec<&str> = lines.iter().map(|s| s.as_str()).collect();
     let f = write_jsonl(&line_refs);
@@ -386,9 +438,24 @@ fn test_from_filter_iana_timezone() {
 #[test]
 fn test_combined_session_and_project_filter() {
     let lines = vec![
-        full_entry(1774481258, "abc-session", "/home/user/myproject", "claude-sonnet-4-5"),
-        full_entry(1774481300, "abc-session", "/home/user/other", "claude-sonnet-4-5"),
-        full_entry(1774481400, "xyz-session", "/home/user/myproject", "claude-sonnet-4-5"),
+        full_entry(
+            1774481258,
+            "abc-session",
+            "/home/user/myproject",
+            "claude-sonnet-4-5",
+        ),
+        full_entry(
+            1774481300,
+            "abc-session",
+            "/home/user/other",
+            "claude-sonnet-4-5",
+        ),
+        full_entry(
+            1774481400,
+            "xyz-session",
+            "/home/user/myproject",
+            "claude-sonnet-4-5",
+        ),
     ];
     let line_refs: Vec<&str> = lines.iter().map(|s| s.as_str()).collect();
     let f = write_jsonl(&line_refs);
