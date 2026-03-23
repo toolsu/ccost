@@ -230,6 +230,10 @@ fn compute_est_budget(
 // ─── Public aggregation functions ─────────────────────────────────────────────
 
 /// Group records by session_id and compute segment-aware summaries.
+///
+/// Subtracts each session's first record values as a baseline to handle
+/// continued sessions (`claude --continue`) where cumulative counters
+/// carry over from the predecessor session without resetting.
 pub fn aggregate_sessions(records: &[SlRecord]) -> Vec<SlSessionSummary> {
     // Group records by session_id, preserving insertion order via BTreeMap
     let mut by_session: BTreeMap<String, Vec<&SlRecord>> = BTreeMap::new();
@@ -250,8 +254,17 @@ pub fn aggregate_sessions(records: &[SlRecord]) -> Vec<SlSessionSummary> {
 
         let max_context_pct = recs.iter().filter_map(|r| r.context_pct).max();
 
-        let (segments, total_cost, total_dur, total_api_dur, total_added, total_removed) =
+        let (segments, raw_cost, raw_dur, raw_api_dur, raw_added, raw_removed) =
             compute_segment_totals(&recs);
+
+        // Subtract session baseline (first record's cumulative values).
+        // For continued sessions, this removes inherited costs from predecessor.
+        // For fresh sessions starting at ~0, this has negligible effect.
+        let total_cost = (raw_cost - first.cost_usd).max(0.0);
+        let total_dur = raw_dur.saturating_sub(first.duration_ms);
+        let total_api_dur = raw_api_dur.saturating_sub(first.api_duration_ms);
+        let total_added = raw_added.saturating_sub(first.lines_added);
+        let total_removed = raw_removed.saturating_sub(first.lines_removed);
 
         let five_hour_pcts: Vec<u8> = recs.iter().filter_map(|r| r.five_hour_pct).collect();
         let seven_day_pcts: Vec<u8> = recs.iter().filter_map(|r| r.seven_day_pct).collect();
@@ -286,8 +299,15 @@ pub fn aggregate_sessions(records: &[SlRecord]) -> Vec<SlSessionSummary> {
 pub fn aggregate_ratelimit(records: &[SlRecord]) -> Vec<SlRateLimitEntry> {
     let mut result = Vec::new();
     let mut last_pair: Option<(u8, u8)> = None;
-    // Track cumulative cost per session for delta calculation
+    // Pre-populate with each session's first cost as baseline.
+    // For continued sessions, this prevents the inherited cost from appearing
+    // as a large delta on the first action.
     let mut last_cost_by_session: BTreeMap<&str, f64> = BTreeMap::new();
+    for rec in records {
+        last_cost_by_session
+            .entry(rec.session_id.as_str())
+            .or_insert(rec.cost_usd);
+    }
 
     for rec in records {
         // All four rate-limit fields must be Some
@@ -336,9 +356,14 @@ pub fn aggregate_ratelimit(records: &[SlRecord]) -> Vec<SlRateLimitEntry> {
 }
 
 /// Compute segment-aware totals for a session's records up to (but not including) a given time.
+///
+/// When no records qualify (all are after `before`), returns the session baseline
+/// instead of zeros, so that delta computation correctly excludes inherited costs
+/// from continued sessions.
 fn segment_totals_before(
     session_recs: &[&SlRecord], // must be sorted by ts
     before: DateTime<Utc>,
+    baseline: (f64, u64, u64, u64, u64),
 ) -> (f64, u64, u64, u64, u64) {
     let filtered: Vec<&SlRecord> = session_recs
         .iter()
@@ -346,7 +371,7 @@ fn segment_totals_before(
         .copied()
         .collect();
     if filtered.is_empty() {
-        return (0.0, 0, 0, 0, 0);
+        return baseline;
     }
     let (_, cost, dur, api, added, removed) = compute_segment_totals(&filtered);
     (cost, dur, api, added, removed)
@@ -388,10 +413,19 @@ fn build_window_summary(
     let mut total_lines_removed = 0_u64;
     for sid in &session_ids {
         if let Some(sess_recs) = by_session.get(sid) {
+            // Session baseline: first record's cumulative values (may be inherited from continue)
+            let first = sess_recs[0];
+            let baseline = (
+                first.cost_usd,
+                first.duration_ms,
+                first.api_duration_ms,
+                first.lines_added,
+                first.lines_removed,
+            );
             let (c_end, d_end, a_end, la_end, lr_end) =
-                segment_totals_before(sess_recs, window_end);
+                segment_totals_before(sess_recs, window_end, baseline);
             let (c_start, d_start, a_start, la_start, lr_start) =
-                segment_totals_before(sess_recs, window_start);
+                segment_totals_before(sess_recs, window_start, baseline);
             total_cost += (c_end - c_start).max(0.0);
             total_duration_ms += d_end.saturating_sub(d_start);
             total_api_duration_ms += a_end.saturating_sub(a_start);
@@ -418,6 +452,11 @@ fn build_window_summary(
         window_end.timestamp(),
     );
 
+    let (est_5h_budget, est_1w_budget) = match window_type {
+        WindowType::OneHour | WindowType::FiveHour => (est_budget, None),
+        WindowType::OneWeek => (None, est_budget),
+    };
+
     Some(SlWindowSummary {
         window_start,
         window_end,
@@ -425,7 +464,8 @@ fn build_window_summary(
         max_five_hour_pct,
         sessions: session_count,
         total_cost,
-        est_budget,
+        est_5h_budget,
+        est_1w_budget,
         total_duration_ms,
         total_api_duration_ms,
         total_lines_added,

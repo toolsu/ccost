@@ -648,7 +648,7 @@ Analyze Claude statusline data (rate limits, sessions, costs).
 Options:
   --file <path>         Path to statusline.jsonl (default: ~/.claude/statusline.jsonl)
   --per <dim>           Group by: action, session, project, day, 1h, 5h (default), 1w
-  --nopromo             Disable promo adjustment for Est Budget (default: adjusts for 2x promo periods)
+  --nopromo             Disable promo adjustment for Est 5h/1w Budget (default: adjusts for 2x promo periods)
   --chart <mode>        Chart mode: 5h, 1w, cost
   --cost-diff           Compare SL costs with LiteLLM pricing (requires --per session)
   --from <date>         Start date (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
