@@ -21,6 +21,7 @@ use tempfile::NamedTempFile;
 /// - `resets_7d`: seven_day resets_at unix timestamp
 ///
 /// Rate limits must have all 4 fields (five_h, seven_d, resets_5h, resets_7d) or none.
+#[allow(clippy::too_many_arguments)]
 fn make_sl_line(
     ts: i64,
     session: &str,

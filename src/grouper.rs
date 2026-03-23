@@ -66,7 +66,7 @@ fn get_group_key_resolved(
         GroupDimension::Project => record.project.clone(),
         GroupDimension::Model => shorten_model_name(&record.model),
         GroupDimension::Day => format_timestamp_resolved(record, "%Y-%m-%d", tz),
-        GroupDimension::Hour => format_timestamp_resolved(record, "%Y-%m-%dT%H:00", tz),
+        GroupDimension::Hour => format_timestamp_resolved(record, "%Y-%m-%d %H:00", tz),
         GroupDimension::Month => format_timestamp_resolved(record, "%Y-%m", tz),
     }
 }
@@ -309,11 +309,10 @@ mod tests {
     }
 
     #[test]
-    fn test_get_group_key_hour_utc_uses_t() {
+    fn test_get_group_key_hour_utc() {
         let rec = mock_record("2026-03-15", "model", "s1", "proj");
         let key = get_group_key(&rec, GroupDimension::Hour, Some("UTC"));
-        assert!(key.contains("T"), "Hour key '{}' should contain T separator", key);
-        assert!(key.ends_with(":00"), "Hour key '{}' should end with :00", key);
+        assert_eq!(key, "2026-03-15 12:00");
     }
 
     #[test]

@@ -16,6 +16,7 @@ fn make_fixture(records: &[serde_json::Value]) -> TempDir {
     dir
 }
 
+#[allow(clippy::too_many_arguments)]
 fn mock_rec(
     model: &str,
     input: u64,

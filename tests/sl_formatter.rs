@@ -30,6 +30,7 @@ fn make_ratelimit_entry(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_session_summary(
     session_id: &str,
     project: &str,

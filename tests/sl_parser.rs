@@ -79,7 +79,7 @@ fn test_basic_record_parsing() {
 
 #[test]
 fn test_multiple_records() {
-    let lines = vec![
+    let lines = [
         full_entry(1774481258, "sess-1", "/proj/a", "claude-opus-4"),
         full_entry(1774481300, "sess-2", "/proj/b", "claude-sonnet-4-5"),
         full_entry(1774481400, "sess-3", "/proj/c", "claude-haiku-4"),
@@ -118,7 +118,7 @@ fn test_record_without_rate_limits() {
 
 #[test]
 fn test_mixed_records_with_and_without_rate_limits() {
-    let lines = vec![
+    let lines = [
         full_entry(1774481258, "sess-1", "/proj/a", "claude-opus-4"),
         entry_no_rate_limits(1774481300, "sess-2", "/proj/b", "claude-haiku-4"),
     ];
@@ -138,7 +138,7 @@ fn test_mixed_records_with_and_without_rate_limits() {
 #[test]
 fn test_malformed_lines_skipped() {
     let good = full_entry(1774481258, "sess-good", "/proj/good", "claude-sonnet-4-5");
-    let lines = vec![
+    let lines = [
         good.as_str(),
         "not valid json",
         r#"{"ts": 123}"#,                                     // missing data
@@ -176,7 +176,7 @@ fn test_empty_file() {
 
 #[test]
 fn test_session_filter_case_insensitive() {
-    let lines = vec![
+    let lines = [
         full_entry(1774481258, "ABCDEF-session", "/proj/a", "claude-sonnet-4-5"),
         full_entry(1774481300, "xyz-session", "/proj/b", "claude-sonnet-4-5"),
         full_entry(1774481400, "abcdef-OTHER", "/proj/c", "claude-sonnet-4-5"),
@@ -212,7 +212,7 @@ fn test_session_filter_no_match() {
 
 #[test]
 fn test_project_filter_case_insensitive() {
-    let lines = vec![
+    let lines = [
         full_entry(
             1774481258,
             "sess-1",
@@ -249,7 +249,7 @@ fn test_project_filter_case_insensitive() {
 #[test]
 fn test_model_filter_matches_model_id() {
     // Use distinct display_names so "sonnet" only appears in one entry
-    let lines = vec![
+    let lines = [
         full_entry_with_display(
             1774481258,
             "sess-1",
@@ -289,7 +289,7 @@ fn test_model_filter_matches_model_id() {
 fn test_model_filter_matches_display_name() {
     // entry_no_rate_limits uses "Claude Haiku" as display_name; the model_id does not contain "haiku"
     // Use a model_id that won't match on its own to confirm the display_name is also searched
-    let lines = vec![
+    let lines = [
         full_entry_with_display(
             1774481258,
             "sess-1",
@@ -327,7 +327,7 @@ fn test_model_filter_matches_display_name() {
 
 #[test]
 fn test_from_filter_date_only_utc() {
-    let lines = vec![
+    let lines = [
         full_entry(1774483200, "sess-1", "/proj/a", "claude-sonnet-4-5"), // 2026-03-26
         full_entry(1774569600, "sess-2", "/proj/b", "claude-sonnet-4-5"), // 2026-03-27
         full_entry(1774656000, "sess-3", "/proj/c", "claude-sonnet-4-5"), // 2026-03-28
@@ -348,7 +348,7 @@ fn test_from_filter_date_only_utc() {
 
 #[test]
 fn test_to_filter_date_only_utc() {
-    let lines = vec![
+    let lines = [
         full_entry(1774483200, "sess-1", "/proj/a", "claude-sonnet-4-5"), // 2026-03-26
         full_entry(1774569600, "sess-2", "/proj/b", "claude-sonnet-4-5"), // 2026-03-27
         full_entry(1774656000, "sess-3", "/proj/c", "claude-sonnet-4-5"), // 2026-03-28
@@ -368,7 +368,7 @@ fn test_to_filter_date_only_utc() {
 
 #[test]
 fn test_from_to_filter_utc() {
-    let lines = vec![
+    let lines = [
         full_entry(1774483200, "sess-1", "/proj/a", "claude-sonnet-4-5"), // 2026-03-26
         full_entry(1774569600, "sess-2", "/proj/b", "claude-sonnet-4-5"), // 2026-03-27
         full_entry(1774656000, "sess-3", "/proj/c", "claude-sonnet-4-5"), // 2026-03-28
@@ -393,7 +393,7 @@ fn test_from_filter_fixed_offset() {
     // UTC+8 (fixed offset):
     // 1774483200 = 2026-03-26T00:00:00Z = 2026-03-26T08:00:00+08:00 -> date 2026-03-26 (excluded by from=2026-03-27)
     // 1774569600 = 2026-03-27T00:00:00Z = 2026-03-27T08:00:00+08:00 -> date 2026-03-27 (included)
-    let lines = vec![
+    let lines = [
         full_entry(1774483200, "sess-1", "/proj/a", "claude-sonnet-4-5"),
         full_entry(1774569600, "sess-2", "/proj/b", "claude-sonnet-4-5"),
     ];
@@ -416,7 +416,7 @@ fn test_from_filter_iana_timezone() {
     // Asia/Shanghai = UTC+8 (same as +08:00 for these dates, no DST)
     // 1774483200 = 2026-03-26T08:00:00+08:00 -> date 2026-03-26 (excluded by from=2026-03-27)
     // 1774569600 = 2026-03-27T08:00:00+08:00 -> date 2026-03-27 (included)
-    let lines = vec![
+    let lines = [
         full_entry(1774483200, "sess-1", "/proj/a", "claude-sonnet-4-5"),
         full_entry(1774569600, "sess-2", "/proj/b", "claude-sonnet-4-5"),
     ];
@@ -437,7 +437,7 @@ fn test_from_filter_iana_timezone() {
 
 #[test]
 fn test_combined_session_and_project_filter() {
-    let lines = vec![
+    let lines = [
         full_entry(
             1774481258,
             "abc-session",

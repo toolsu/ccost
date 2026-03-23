@@ -1440,7 +1440,11 @@ fn compute_cost_diffs(
                     .filter(|(k, _)| {
                         k.starts_with(&s.session_id) || s.session_id.starts_with(k.as_str())
                     })
-                    .max_by_key(|(k, _)| k.len().min(s.session_id.len()))
+                    .max_by(|(k1, _), (k2, _)| {
+                        let len1 = k1.len().min(s.session_id.len());
+                        let len2 = k2.len().min(s.session_id.len());
+                        len1.cmp(&len2).then_with(|| k1.cmp(k2))
+                    })
                     .map(|(_, v)| *v)
             });
 
