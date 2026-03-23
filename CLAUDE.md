@@ -45,9 +45,9 @@ sl pipeline: `load_sl_records → filter → aggregate (segment-aware) → forma
 
 **`--table auto` behavior:** When writing to file (`--output`/`--filename`), auto selects full table. When printing to terminal, auto selects compact if width < 120.
 
-**Hour key format:** Grouper emits `%Y-%m-%dT%H:00` (ISO 8601 T separator) so chart `auto_granularity_from_labels` correctly detects hour labels.
+**Hour key format:** Grouper emits `%Y-%m-%d %H:00` (space separator). Chart `auto_granularity_from_labels` detects hour labels by checking `len > 10 && contains(':')` (matches both space and T separators).
 
-**Types:** `GroupDimension` and `SortOrder` implement `std::str::FromStr`. CLI supports `-h`/`-V` short flags in addition to `--help`/`--version`.
+**Types:** `GroupDimension` and `SortOrder` implement `std::str::FromStr` (returns `Result<Self, String>`). Use `"day".parse::<GroupDimension>()` or `GroupDimension::from_str("day")`. CLI supports `-h`/`-V` short flags in addition to `--help`/`--version`.
 
 ## Commands
 

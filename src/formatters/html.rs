@@ -313,17 +313,35 @@ fn build_js(_num_cols: usize) -> String {
     return groups;
   }
 
+  function sfx(n, s) {
+    if (!s) return n;
+    s = s.toUpperCase();
+    if (s === 'K') return n * 1e3;
+    if (s === 'M') return n * 1e6;
+    if (s === 'G' || s === 'B') return n * 1e9;
+    return n;
+  }
+
   function parseValue(text) {
-    const cleaned = text.replace(/\(.*?\)/g, '').trim();
-    const match = cleaned.match(/^[\$]?([\d,.]+)\s*([KMGB])?$/i);
-    if (!match) return 0;
-    let num = parseFloat(match[1].replace(/,/g, ''));
-    const suffix = (match[2] || '').toUpperCase();
-    if (suffix === 'K') num *= 1e3;
-    else if (suffix === 'M') num *= 1e6;
-    else if (suffix === 'G') num *= 1e9;
-    else if (suffix === 'B') num *= 1e9;
-    return num;
+    const t = text.replace(/\(.*?\)/g, '').trim();
+    if (t === '\u2014' || t === '' || t === '-') return NaN;
+    // Dollar: $1.23 or $1.2K
+    let m = t.match(/^\$([\d,.]+)\s*([KMGB])?$/i);
+    if (m) return sfx(parseFloat(m[1].replace(/,/g, '')), m[2]);
+    // Duration: 1d 2h 30m 15s (any combo)
+    m = t.match(/^(?:(\d+)d\s*)?(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?$/);
+    if (m && (m[1]||m[2]||m[3]||m[4]))
+      return ((+m[1]||0)*86400)+((+m[2]||0)*3600)+((+m[3]||0)*60)+(+m[4]||0);
+    // Pct range: 10%–25% or 10% — sort by max
+    m = t.match(/([\d.]+)%/g);
+    if (m) return parseFloat(m[m.length - 1]);
+    // Lines: +123 -45
+    m = t.match(/^\+([\d,]+)\s+-([\d,]+)$/);
+    if (m) return parseInt(m[1].replace(/,/g,'')) + parseInt(m[2].replace(/,/g,''));
+    // Plain number with optional suffix: 1,200 or 1.2K
+    m = t.match(/^([\d,.]+)\s*([KMGB])?$/i);
+    if (m) return sfx(parseFloat(m[1].replace(/,/g, '')), m[2]);
+    return NaN;
   }
 
   function getCellValue(row, col) {
@@ -361,11 +379,8 @@ fn build_js(_num_cols: usize) -> String {
           const bText = getCellValue(b.parent, colIdx);
           const aNum = parseValue(aText);
           const bNum = parseValue(bText);
-          const aIsNum = aNum !== 0 || /^\$?0/.test(aText.trim());
-          const bIsNum = bNum !== 0 || /^\$?0/.test(bText.trim());
-
           let cmp;
-          if (aIsNum && bIsNum) {
+          if (!isNaN(aNum) && !isNaN(bNum)) {
             cmp = aNum - bNum;
           } else {
             cmp = aText.localeCompare(bText);

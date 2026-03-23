@@ -1,0 +1,43 @@
+{
+  "name": "ccost",
+  "version": "0.0.0",
+  "description": "Analyze Claude Code token usage and costs from local conversation history",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toolsu/ccost"
+  },
+  "author": "Tom Chen",
+  "license": "MIT",
+  "bin": {
+    "ccost": "run.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "files": [
+    "install.js",
+    "run.js"
+  ],
+  "engines": {
+    "node": ">=14"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64",
+    "ia32",
+    "arm"
+  ],
+  "keywords": [
+    "claude",
+    "token",
+    "usage",
+    "cost",
+    "anthropic",
+    "claude-code"
+  ]
+}

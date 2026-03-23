@@ -106,9 +106,9 @@ Granularity auto-selects based on range (hour/day/month). Only `--output txt` wo
 | `--help` | Show help. |
 | `--version` | Show version. |
 
-## Statusline Analysis (`ccost sl`)
+## Statusline Analysis
 
-Analyzes `~/.claude/statusline.jsonl`, a file produced by a Claude Code statusline hook that snapshots rate limits, cost, duration, and context window usage on every action.
+`ccost sl` command can analyze `~/.claude/statusline.jsonl`, a file produced by a Claude Code statusline hook that snapshots rate limits, cost, duration, and context window usage on every action.
 
 ### Setup
 

@@ -13,6 +13,11 @@ categories = ["command-line-utilities"]
 name = "ccost"
 path = "src/main.rs"
 
+[[bin]]
+name = "update-pricing"
+path = "scripts/update-pricing.rs"
+publish = false
+
 [lib]
 name = "ccost"
 path = "src/lib.rs"

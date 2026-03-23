@@ -1220,16 +1220,35 @@ fn build_sl_js(_num_cols: usize) -> String {
   const ths = thead.querySelectorAll('th');
   let sortState = {};
 
+  function sfx(n, s) {
+    if (!s) return n;
+    s = s.toUpperCase();
+    if (s === 'K') return n * 1e3;
+    if (s === 'M') return n * 1e6;
+    if (s === 'G' || s === 'B') return n * 1e9;
+    return n;
+  }
+
   function parseValue(text) {
-    const cleaned = text.replace(/\(.*?\)/g, '').trim();
-    const match = cleaned.match(/^[\$]?([\d,.]+)\s*([KMGB])?$/i);
-    if (!match) return 0;
-    let num = parseFloat(match[1].replace(/,/g, ''));
-    const suffix = (match[2] || '').toUpperCase();
-    if (suffix === 'K') num *= 1e3;
-    else if (suffix === 'M') num *= 1e6;
-    else if (suffix === 'G' || suffix === 'B') num *= 1e9;
-    return num;
+    const t = text.replace(/\(.*?\)/g, '').trim();
+    if (t === '\u2014' || t === '' || t === '-') return NaN;
+    // Dollar: $1.23 or $1.2K
+    let m = t.match(/^\$([\d,.]+)\s*([KMGB])?$/i);
+    if (m) return sfx(parseFloat(m[1].replace(/,/g, '')), m[2]);
+    // Duration: 1d 2h 30m 15s (any combo)
+    m = t.match(/^(?:(\d+)d\s*)?(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?$/);
+    if (m && (m[1]||m[2]||m[3]||m[4]))
+      return ((+m[1]||0)*86400)+((+m[2]||0)*3600)+((+m[3]||0)*60)+(+m[4]||0);
+    // Pct range: 10%–25% or 10% — sort by max
+    m = t.match(/([\d.]+)%/g);
+    if (m) return parseFloat(m[m.length - 1]);
+    // Lines: +123 -45
+    m = t.match(/^\+([\d,]+)\s+-([\d,]+)$/);
+    if (m) return parseInt(m[1].replace(/,/g,'')) + parseInt(m[2].replace(/,/g,''));
+    // Plain number with optional suffix: 1,200 or 1.2K
+    m = t.match(/^([\d,.]+)\s*([KMGB])?$/i);
+    if (m) return sfx(parseFloat(m[1].replace(/,/g, '')), m[2]);
+    return NaN;
   }
 
   function getCellValue(row, col) {
@@ -1264,10 +1283,8 @@ fn build_sl_js(_num_cols: usize) -> String {
           const bText = getCellValue(b.row, colIdx);
           const aNum = parseValue(aText);
           const bNum = parseValue(bText);
-          const aIsNum = aNum !== 0 || /^\$?0/.test(aText.trim());
-          const bIsNum = bNum !== 0 || /^\$?0/.test(bText.trim());
           let cmp;
-          if (aIsNum && bIsNum) cmp = aNum - bNum;
+          if (!isNaN(aNum) && !isNaN(bNum)) cmp = aNum - bNum;
           else cmp = aText.localeCompare(bText);
           return next === 'desc' ? -cmp : cmp;
         });
@@ -1395,6 +1412,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn make_session_summary(
         session_id: &str,
         project: &str,
@@ -1438,15 +1456,15 @@ mod tests {
     fn test_fmt_duration_minutes() {
         assert_eq!(fmt_duration(60_000), "1m 0s");
         assert_eq!(fmt_duration(90_000), "1m 30s");
-        assert_eq!(fmt_duration(3599_000), "59m 59s");
+        assert_eq!(fmt_duration(3_599_000), "59m 59s");
     }
 
     #[test]
     fn test_fmt_duration_hours() {
-        assert_eq!(fmt_duration(3600_000), "1h 0m");
-        assert_eq!(fmt_duration(3660_000), "1h 1m");
-        assert_eq!(fmt_duration(7200_000), "2h 0m");
-        assert_eq!(fmt_duration(7320_000), "2h 2m");
+        assert_eq!(fmt_duration(3_600_000), "1h 0m");
+        assert_eq!(fmt_duration(3_660_000), "1h 1m");
+        assert_eq!(fmt_duration(7_200_000), "2h 0m");
+        assert_eq!(fmt_duration(7_320_000), "2h 2m");
     }
 
     #[test]
@@ -1668,8 +1686,8 @@ mod tests {
             "abc123",
             "/home/user/foo/bar",
             0.50,
-            3600_000,
-            1800_000,
+            3_600_000,
+            1_800_000,
             100,
             50,
             Some(75),
@@ -1707,8 +1725,8 @@ mod tests {
             "abc123",
             "/home/user/foo/bar",
             0.50,
-            3600_000,
-            1800_000,
+            3_600_000,
+            1_800_000,
             100,
             50,
             Some(75),
@@ -1763,8 +1781,8 @@ mod tests {
     #[test]
     fn test_json_sessions_has_totals() {
         let sessions = vec![
-            make_session_summary("s1", "/proj/a", 0.5, 3600_000, 1800_000, 10, 5, None, 1),
-            make_session_summary("s2", "/proj/b", 0.3, 1800_000, 900_000, 5, 2, None, 1),
+            make_session_summary("s1", "/proj/a", 0.5, 3_600_000, 1_800_000, 10, 5, None, 1),
+            make_session_summary("s2", "/proj/b", 0.3, 1_800_000, 900_000, 5, 2, None, 1),
         ];
         let meta = SlJsonMeta {
             source: "test".to_string(),
@@ -1863,8 +1881,8 @@ mod tests {
             "abc123",
             "/proj/a",
             0.5,
-            3600_000,
-            1800_000,
+            3_600_000,
+            1_800_000,
             10,
             5,
             Some(50),

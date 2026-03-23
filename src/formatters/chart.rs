@@ -39,11 +39,11 @@ fn auto_granularity_from_labels(labels: &[&str]) -> Granularity {
         return Granularity::Day;
     }
     // Check label format
-    // Hour: "YYYY-MM-DDTHH" (len 13) or "YYYY-MM-DDTHH:MM" etc
+    // Hour: "YYYY-MM-DD HH:00" (space) or "YYYY-MM-DDTHH:00" (T)
     // Day: "YYYY-MM-DD" (len 10)
     // Month: "YYYY-MM" (len 7)
     let first = labels[0];
-    if first.contains('T') {
+    if first.contains('T') || (first.len() > 10 && first.contains(':')) {
         Granularity::Hour
     } else if first.len() == 10 {
         Granularity::Day

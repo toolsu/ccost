@@ -7,6 +7,7 @@ use chrono::{TimeZone, Utc};
 
 // ─── Helper to build a minimal SlRecord ──────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 fn make_record(
     ts_secs: i64,
     session_id: &str,
