@@ -21,7 +21,7 @@ sl pipeline: `load_sl_records → filter → aggregate (segment-aware) → forma
 
 ## Key design decisions
 
-**Dedup: `messageId:requestId` keep-max-output, global across all files.** Streaming entries have monotonically increasing `output_tokens`; keeping max is order-independent. Same composite key appears in both parent and `subagents/` files — global dedup prevents double-counting.
+**Dedup: `messageId:requestId` keep-max-output, global across all files.** Streaming entries have monotonically increasing `output_tokens`; keeping max is order-independent. Same composite key appears in both parent and `subagents/` files — global dedup prevents double-counting. Subagent files are found in both old (`<project>/subagents/<session>_<agent>.jsonl`) and new (`<project>/<session-uuid>/subagents/<agent>.jsonl`) directory structures; `extract_session_id` maps new-structure files to the parent session UUID via the grandparent directory name.
 
 **Pricing: flat rate per-record before grouping.** Each record gets its model's price. Supports `--live-pricing` (runtime fetch via reqwest) and `--pricing-data <path>` (custom file). Bundled pricing embedded via `include_str!`.
 
@@ -29,11 +29,13 @@ sl pipeline: `load_sl_records → filter → aggregate (segment-aware) → forma
 
 **Timezone handling:** Uses `chrono` + `chrono-tz` for IANA timezone support, `chrono::FixedOffset` for +HH:MM offsets, `chrono::Local` for system timezone.
 
-**sl segment-aware aggregation:** statusline.jsonl has cumulative counters (cost, duration, tokens, lines) that reset to 0 on session resume. Detect resets by comparing consecutive records; sum max-per-segment across segments.
+**sl segment-aware aggregation:** statusline.jsonl has cumulative counters (cost, duration, tokens, lines) that reset to 0 on session resume. Detect resets by comparing consecutive records; sum max-per-segment across segments. For continued sessions (`claude --continue`), cumulative counters carry over from the predecessor without resetting; `aggregate_sessions` subtracts the first record's values as baseline to exclude inherited costs. Window aggregation (`segment_totals_before`) returns the session baseline (not zeros) when no records exist before a time point, ensuring delta computation correctly handles continued sessions.
 
 **sl unified table columns:** All `--per` views (session/project/day/1h/5h/1w) share the same column set: `[Label] | Cost | Duration | API Time | Lines +/- | Sess | 5h% | 1w%`. `--per 1h`/`--per 5h` add `Est 5h Budg` (= cost × 100 / Δ5h%); `--per 1w` adds `Est 1w Budg`. `--per 1h` also adds `5h Resets`. `--per action` includes `Cost` (delta). `5h%` and `1w%` show min–max ranges. Compact mode: `[Label] | Cost | Duration | Sess | 5h%`.
 
-**sl promo adjustment (default on):** Adjusts Est Budget for known 2x usage promo periods (2025-12, 2026-03). Hardcoded UTC intervals in `aggregator.rs`. Adjustment: `adjusted_delta = delta_pct × (1 + promo_overlap_ratio)`. Disable with `--nopromo`.
+**sl promo adjustment (default on):** Adjusts Est 5h/1w Budget for known 2x usage promo periods (2025-12, 2026-03). Hardcoded UTC intervals in `aggregator.rs`. Adjustment: `adjusted_delta = delta_pct × (1 + promo_overlap_ratio)`. Disable with `--nopromo`.
+
+**sl JSON field naming:** `SlWindowSummary` has separate `est_5h_budget` and `est_1w_budget` fields (serialized as `est5hBudget`/`est1wBudget`). For 1h/5h views, `est_5h_budget` is populated; for 1w views, `est_1w_budget` is populated. The other is `null`.
 
 **`--table auto` behavior:** When writing to file (`--output`/`--filename`), auto selects full table. When printing to terminal, auto selects compact if width < 120.
 

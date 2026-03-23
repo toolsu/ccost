@@ -435,6 +435,35 @@ fn dedup_kept_indices_raw(records: &[RawRecord]) -> (Vec<usize>, DedupStats) {
     (kept, DedupStats { before, after })
 }
 
+/// Extract session ID from a JSONL file path.
+///
+/// Handles two subagent directory structures:
+/// - Old: `<project>/subagents/<session>_<agent>.jsonl` → file stem
+/// - New: `<project>/<session-uuid>/subagents/<agent>.jsonl` → grandparent dir name
+///
+/// For non-subagent files, uses the file stem (the session UUID).
+fn extract_session_id(file_path: &Path) -> String {
+    // Check if this file is under a `subagents/` directory with a session UUID parent
+    if let Some(parent) = file_path.parent() {
+        if parent.file_name().and_then(|n| n.to_str()) == Some("subagents") {
+            if let Some(grandparent) = parent.parent() {
+                if let Some(gp_name) = grandparent.file_name().and_then(|n| n.to_str()) {
+                    // New structure: grandparent is a UUID-like session ID (not a project dir)
+                    if gp_name.len() == 36 && gp_name.chars().filter(|&c| c == '-').count() == 4 {
+                        return gp_name.to_string();
+                    }
+                }
+            }
+        }
+    }
+    // Default: use file stem
+    file_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_string()
+}
+
 /// Recursively find all *.jsonl files under a directory.
 fn find_jsonl_files(dir: &Path) -> Vec<PathBuf> {
     let mut result = Vec::new();
@@ -555,11 +584,7 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
 
             let file_path_str = file_path.to_string_lossy();
             let project = extract_project_name(&file_path_str);
-            let session_id = file_path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_string();
+            let session_id = extract_session_id(file_path);
 
             Some(ParsedFile {
                 file_mtime,
@@ -851,6 +876,34 @@ mod tests {
     fn test_extract_project_name_no_projects() {
         let path = "/home/user/.claude/sessions/abc.jsonl";
         assert_eq!(extract_project_name(path), "unknown");
+    }
+
+    #[test]
+    fn test_extract_session_id_main_file() {
+        let path = Path::new("/home/user/.claude/projects/-proj/abc12345-1234-5678-9abc-def012345678.jsonl");
+        assert_eq!(
+            extract_session_id(path),
+            "abc12345-1234-5678-9abc-def012345678"
+        );
+    }
+
+    #[test]
+    fn test_extract_session_id_old_subagent() {
+        // Old structure: projects/<project>/subagents/<session>_<agent>.jsonl
+        let path = Path::new("/home/user/.claude/projects/-proj/subagents/abc12345_agent1.jsonl");
+        // Parent is "subagents", grandparent is "-proj" (not a UUID) → falls back to file stem
+        assert_eq!(extract_session_id(path), "abc12345_agent1");
+    }
+
+    #[test]
+    fn test_extract_session_id_new_subagent() {
+        // New structure: projects/<project>/<session-uuid>/subagents/<agent>.jsonl
+        let path = Path::new("/home/user/.claude/projects/-proj/abc12345-1234-5678-9abc-def012345678/subagents/agent-a0f53f284339341b2.jsonl");
+        // Parent is "subagents", grandparent is UUID → use grandparent
+        assert_eq!(
+            extract_session_id(path),
+            "abc12345-1234-5678-9abc-def012345678"
+        );
     }
 
     #[test]

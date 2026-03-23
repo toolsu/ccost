@@ -102,16 +102,16 @@ fn test_single_segment_session() {
     let s = &summaries[0];
     assert_eq!(s.session_id, "s1");
     assert_eq!(s.segments, 1);
-    // Max of each cumulative field within the single segment
+    // Delta: max minus first record's baseline (0.5-0.1, 2500-500, 1100-200, 20-5, 9-2)
     assert!(
-        (s.total_cost - 0.5).abs() < 1e-9,
+        (s.total_cost - 0.4).abs() < 1e-9,
         "total_cost={}",
         s.total_cost
     );
-    assert_eq!(s.total_duration_ms, 2500);
-    assert_eq!(s.total_api_duration_ms, 1100);
-    assert_eq!(s.total_lines_added, 20);
-    assert_eq!(s.total_lines_removed, 9);
+    assert_eq!(s.total_duration_ms, 2000);
+    assert_eq!(s.total_api_duration_ms, 900);
+    assert_eq!(s.total_lines_added, 15);
+    assert_eq!(s.total_lines_removed, 7);
     assert_eq!(s.max_context_pct, Some(30));
     assert_eq!(s.first_ts.timestamp(), 1000);
     assert_eq!(s.last_ts.timestamp(), 3000);
@@ -142,13 +142,13 @@ fn test_multi_segment_session_cost_reset() {
 
     let s = &summaries[0];
     assert_eq!(s.segments, 2, "should detect 2 segments");
-    // Segment 1 max: cost=0.5, dur=1500; Segment 2 max: cost=0.3, dur=1000 → sum = 0.8, 2500
+    // Seg1 max: 0.5,1500; Seg2 max: 0.3,1000; sum=0.8,2500; minus baseline(0.1,500) → 0.7,2000
     assert!(
-        (s.total_cost - 0.8).abs() < 1e-9,
+        (s.total_cost - 0.7).abs() < 1e-9,
         "total_cost={}",
         s.total_cost
     );
-    assert_eq!(s.total_duration_ms, 2500);
+    assert_eq!(s.total_duration_ms, 2000);
 }
 
 #[test]
@@ -175,9 +175,9 @@ fn test_multi_segment_session_duration_reset() {
 
     let s = &summaries[0];
     assert_eq!(s.segments, 2, "duration drop should trigger new segment");
-    // Seg1 max: 0.5, 5000; Seg2 max: 0.4, 3000 → total: 0.9, 8000
-    assert!((s.total_cost - 0.9).abs() < 1e-9);
-    assert_eq!(s.total_duration_ms, 8000);
+    // Seg1 max: 0.5,5000; Seg2 max: 0.4,3000; sum=0.9,8000; minus baseline(0.2,2000) → 0.7,6000
+    assert!((s.total_cost - 0.7).abs() < 1e-9);
+    assert_eq!(s.total_duration_ms, 6000);
 }
 
 #[test]
@@ -293,10 +293,101 @@ fn test_multiple_sessions() {
     let s1 = summaries.iter().find(|s| s.session_id == "s1").unwrap();
     let s2 = summaries.iter().find(|s| s.session_id == "s2").unwrap();
 
-    assert!((s1.total_cost - 0.3).abs() < 1e-9);
-    assert!((s2.total_cost - 0.6).abs() < 1e-9);
+    // s1: max=0.3 - baseline=0.1 = 0.2; s2: max=0.6 - baseline=0.2 = 0.4
+    assert!((s1.total_cost - 0.2).abs() < 1e-9);
+    assert!((s2.total_cost - 0.4).abs() < 1e-9);
     assert_eq!(s1.max_context_pct, Some(15));
     assert_eq!(s2.max_context_pct, Some(20));
+}
+
+#[test]
+fn test_continued_session_baseline_subtraction() {
+    // Simulates `claude --continue`: session B inherits cumulative values from session A.
+    // Session A: $0 → $10 (fresh start)
+    // Session B: $10 → $10.50 (continued, inherits $10 baseline)
+    let records = vec![
+        // Session A: fresh start
+        make_record(
+            1000, "sA", "/proj/a", 0.0, 0, 0, 0, 0, None, None, None, None, None,
+        ),
+        make_record(
+            2000, "sA", "/proj/a", 5.0, 3000, 1000, 100, 20, None, None, None, None, None,
+        ),
+        make_record(
+            3000, "sA", "/proj/a", 10.0, 6000, 2000, 200, 40, None, None, None, None, None,
+        ),
+        // Session B: continued from A (inherits $10, 6000ms, etc.)
+        make_record(
+            4000, "sB", "/proj/a", 10.0, 6000, 2000, 200, 40, None, None, None, None, None,
+        ),
+        make_record(
+            5000, "sB", "/proj/a", 10.3, 6500, 2200, 210, 42, None, None, None, None, None,
+        ),
+        make_record(
+            6000, "sB", "/proj/a", 10.5, 7000, 2400, 220, 45, None, None, None, None, None,
+        ),
+    ];
+
+    let summaries = aggregate_sessions(&records);
+    assert_eq!(summaries.len(), 2);
+
+    let sa = summaries.iter().find(|s| s.session_id == "sA").unwrap();
+    let sb = summaries.iter().find(|s| s.session_id == "sB").unwrap();
+
+    // Session A: baseline=0, delta = $10
+    assert!(
+        (sa.total_cost - 10.0).abs() < 1e-9,
+        "sA cost={}",
+        sa.total_cost
+    );
+    assert_eq!(sa.total_duration_ms, 6000);
+    assert_eq!(sa.total_lines_added, 200);
+
+    // Session B: baseline=$10, delta = $0.50 (NOT $10.50!)
+    assert!(
+        (sb.total_cost - 0.5).abs() < 1e-9,
+        "sB cost={} (should be 0.5, not 10.5)",
+        sb.total_cost
+    );
+    assert_eq!(sb.total_duration_ms, 1000); // 7000 - 6000
+    assert_eq!(sb.total_api_duration_ms, 400); // 2400 - 2000
+    assert_eq!(sb.total_lines_added, 20); // 220 - 200
+    assert_eq!(sb.total_lines_removed, 5); // 45 - 40
+}
+
+#[test]
+fn test_continued_session_with_reset() {
+    // Continued session that also has an internal reset
+    let records = vec![
+        // Session: continued with baseline=$10, then resets mid-session
+        make_record(
+            1000, "s1", "/proj/a", 10.0, 6000, 2000, 200, 40, None, None, None, None, None,
+        ),
+        make_record(
+            2000, "s1", "/proj/a", 10.5, 6500, 2200, 210, 42, None, None, None, None, None,
+        ),
+        // Reset: counters drop
+        make_record(
+            3000, "s1", "/proj/a", 0.2, 300, 100, 5, 2, None, None, None, None, None,
+        ),
+        make_record(
+            4000, "s1", "/proj/a", 0.8, 1000, 400, 15, 5, None, None, None, None, None,
+        ),
+    ];
+
+    let summaries = aggregate_sessions(&records);
+    assert_eq!(summaries.len(), 1);
+
+    let s = &summaries[0];
+    assert_eq!(s.segments, 2);
+    // Seg1: max=10.5, Seg2: max=0.8; raw_total=11.3; minus baseline=10.0 → 1.3
+    // = 0.5 (work before reset) + 0.8 (work after reset)
+    assert!(
+        (s.total_cost - 1.3).abs() < 1e-9,
+        "cost={}",
+        s.total_cost
+    );
+    assert_eq!(s.total_duration_ms, 1500); // (6500+1000) - 6000
 }
 
 #[test]
@@ -548,7 +639,39 @@ fn test_ratelimit_empty_input() {
 fn test_window_aggregation_basic() {
     // Window resets_at = 1000 + 5*3600 = 19000 seconds mark
     let resets_at: i64 = 1_774_500_000; // some window boundary
+    let window_start = resets_at - 5 * 3600; // 1_774_482_000
     let records = vec![
+        // Session baselines (before window start, cost=0 = fresh sessions)
+        make_record(
+            window_start - 100,
+            "s1",
+            "/proj/a",
+            0.0,
+            0,
+            0,
+            0,
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
+        make_record(
+            window_start - 100,
+            "s2",
+            "/proj/b",
+            0.0,
+            0,
+            0,
+            0,
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
         make_record(
             1_774_490_000,
             "s1",
@@ -587,19 +710,71 @@ fn test_window_aggregation_basic() {
     assert_eq!(windows.len(), 1);
     let w = &windows[0];
     assert_eq!(w.window_end.timestamp(), resets_at);
-    assert_eq!(w.window_start.timestamp(), resets_at - 5 * 3600);
+    assert_eq!(w.window_start.timestamp(), window_start);
     assert_eq!(w.min_five_hour_pct, 30);
     assert_eq!(w.max_five_hour_pct, 40);
     assert_eq!(w.sessions, 2);
-    // total_cost = max of s1 (0.3) + max of s2 (0.5) = 0.8
+    // total_cost = delta of s1 (0.3-0) + delta of s2 (0.5-0) = 0.8
     assert!(
         (w.total_cost - 0.8).abs() < 1e-9,
         "total_cost={}",
         w.total_cost
     );
-    // est_budget = 0.8 * 100 / (40-30) = 8.0  (delta of 5h%)
-    let est = w.est_budget.unwrap();
-    assert!((est - 8.0).abs() < 1e-9, "est_budget={}", est);
+    // est_5h_budget = 0.8 * 100 / (40-30) = 8.0  (delta of 5h%)
+    let est = w.est_5h_budget.unwrap();
+    assert!((est - 8.0).abs() < 1e-9, "est_5h_budget={}", est);
+}
+
+#[test]
+fn test_window_continued_session() {
+    // A continued session within a window should only count its delta, not inherited baseline.
+    let resets_at: i64 = 1_774_500_000;
+    let window_start = resets_at - 5 * 3600;
+    let records = vec![
+        // Continued session: first record has inherited $10 baseline, appears within the window
+        make_record(
+            window_start + 1000,
+            "s1",
+            "/proj/a",
+            10.0,
+            6000,
+            2000,
+            200,
+            40,
+            None,
+            Some(30),
+            Some(resets_at),
+            Some(50),
+            Some(resets_at + 100000),
+        ),
+        make_record(
+            window_start + 2000,
+            "s1",
+            "/proj/a",
+            10.5,
+            6500,
+            2200,
+            210,
+            42,
+            None,
+            Some(35),
+            Some(resets_at),
+            Some(55),
+            Some(resets_at + 100000),
+        ),
+    ];
+
+    let sessions = aggregate_sessions(&records);
+    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour, false);
+
+    assert_eq!(windows.len(), 1);
+    let w = &windows[0];
+    // Should be $0.50 delta, NOT $10.50 cumulative
+    assert!(
+        (w.total_cost - 0.5).abs() < 1e-9,
+        "window cost={} (should be 0.5, not 10.5)",
+        w.total_cost
+    );
 }
 
 #[test]
@@ -694,8 +869,8 @@ fn test_window_zero_peak_pct_no_est_budget() {
     assert_eq!(windows.len(), 1);
     assert_eq!(windows[0].max_five_hour_pct, 0);
     assert!(
-        windows[0].est_budget.is_none(),
-        "est_budget should be None when delta_pct=0"
+        windows[0].est_5h_budget.is_none(),
+        "est_5h_budget should be None when delta_pct=0"
     );
 }
 

@@ -671,7 +671,7 @@ pub fn format_sl_window_table(
                 fmt_time_short(&w.window_start, tz),
                 fmt_time_short(&w.window_end, tz)
             );
-            let est_budget_str = match w.est_budget {
+            let est_budget_str = match w.est_5h_budget.or(w.est_1w_budget) {
                 Some(b) => format_cost(b, opts.price_mode),
                 None => "\u{2014}".to_string(),
             };
@@ -1810,7 +1810,8 @@ mod tests {
             max_five_hour_pct: 45,
             sessions: 3,
             total_cost: 1.23,
-            est_budget: Some(2.73),
+            est_5h_budget: Some(2.73),
+            est_1w_budget: None,
             total_duration_ms: 5000,
             total_api_duration_ms: 2000,
             total_lines_added: 10,
@@ -1833,6 +1834,8 @@ mod tests {
         assert!(parsed["data"].is_array());
         assert_eq!(parsed["data"][0]["minFiveHourPct"], 45);
         assert_eq!(parsed["data"][0]["maxFiveHourPct"], 45);
+        assert!(parsed["data"][0]["est5hBudget"].as_f64().is_some());
+        assert!(parsed["data"][0]["est1wBudget"].is_null());
     }
 
     #[test]
