@@ -1,21 +1,25 @@
-# ccost <img src="logo.svg" alt="ccost" width="35" />
+# ccost <img src="https://raw.githubusercontent.com/toolsu/ccost/main/logo.svg" alt="ccost" width="35" />
 
 分析 Claude Code 的 token 使用量和费用。
 
-读取 `~/.claude/projects/` 和 `~/.config/claude/projects/` 下的 JSONL 文件，去重流式条目，基于 LiteLLM 定价计算费用，支持多种分组维度，输出为表格、JSON、Markdown、HTML、CSV、TSV 或终端 braille 图表。
+读取 `~/.claude/projects/` 下的 JSONL 文件，去重流式条目，基于 LiteLLM 定价计算费用，支持多种分组维度，输出为表格、JSON、Markdown、HTML、CSV、TSV 或终端 braille 图表（见[截图](#截图)）。
 
-`ccost sl` 子命令分析 `~/.claude/statusline.jsonl`，用于速率限制追踪、会话汇总、预算估算和费用对比。
+[`ccost sl` 子命令](#状态栏数据分析ccost-sl)分析 `~/.claude/statusline.jsonl`，用于速率限制追踪、会话汇总、预算估算和费用对比（参见 [`ccost` 与 `ccost sl` 的对比](#ccost-与-ccost-sl)）。
+
+使用 Rust 编写，速度极快，测试完善。同时也是 [Claude Code 仪表盘](https://github.com/toolsu/claude-code-dashboard)（一个 Tauri 桌面应用）的底层库。
 
 ## 安装
 
 ```bash
-cargo install --path .
+npm i -g ccost
 ```
 
-或直接运行：
+或从 [GitHub Releases](https://github.com/toolsu/ccost/releases) 下载预编译二进制文件。
+
+或通过 Cargo（从源码编译）：
 
 ```bash
-cargo run --release -- [选项]
+cargo install ccost
 ```
 
 ## 快速开始
@@ -108,9 +112,21 @@ ccost sl --chart 5h                      # 速率限制图表
 
 ## 状态栏数据分析（`ccost sl`）
 
-分析 `~/.claude/statusline.jsonl`，这是 Claude Code 状态栏 hook 生成的文件，每次操作记录速率限制、费用、时长和上下文窗口使用情况。
+分析 `~/.claude/statusline.jsonl`，这是 Claude Code 状态栏 hook 生成的文件，每次操作记录速率限制、费用、时长和上下文窗口使用情况（参见 [`ccost` 与 `ccost sl` 的对比](#ccost-与-ccost-sl)）。
 
-### 配置
+### 配置 statusline.jsonl
+
+#### 自动配置
+
+在 Claude Code 中运行（任意系统）：
+
+```
+/statusline Set up a command-type statusline using ~/.claude/statusline.sh (or ~/.claude/statusline.ps1 on Windows). The script should read stdin and append {"ts":<unix_epoch>,"data":<stdin_json>} to ~/.claude/statusline.jsonl. Create the script and configure settings.json.
+```
+
+#### 手动配置
+
+##### Linux、macOS、WSL
 
 在 `~/.claude/settings.json` 中添加：
 
@@ -134,6 +150,26 @@ chmod +x ~/.claude/statusline.sh
 ```
 
 如果已有状态栏脚本，在末尾加上 `echo` 那行即可。
+
+##### Windows (PowerShell)
+
+在 `~/.claude/settings.json` 中添加：
+
+```json
+  "statusLine": {
+    "type": "command",
+    "command": "powershell -NoProfile -File ~/.claude/statusline.ps1"
+  }
+```
+
+创建 `~/.claude/statusline.ps1`：
+
+```powershell
+$input = $Input | Out-String
+$ts = [int](New-TimeSpan -Start (Get-Date '1970-01-01') -End (Get-Date).ToUniversalTime()).TotalSeconds
+$line = "{""ts"":$ts,""data"":" + $input.Trim() + "}"
+Add-Content -Path "$env:USERPROFILE\.claude\statusline.jsonl" -Value $line -Encoding UTF8
+```
 
 ### 视图模式
 
@@ -353,9 +389,35 @@ struct GroupedData {
 
 定价数据编译时从 LiteLLM 打包。用 `--live-pricing` 获取最新，或 `--pricing-data` 指定自定义文件。
 
+### `ccost` 与 `ccost sl`
+
+以下对比 `ccost`（数据来自 `~/.claude/projects/`）和 `ccost sl`（数据来自 `statusline.jsonl`）。
+
+`~/.claude/projects/` 包含每个 API 请求的 JSONL 日志，记录了详细的 token 计数（输入、输出、缓存创建、缓存读取）。`ccost` 基于这些计数和 LiteLLM 定价计算费用。
+
+`~/.claude/statusline.jsonl` 包含 Claude Code 状态栏的定期快照，其中有服务端返回的累计费用，以及5小时和1周速率限制使用百分比，这些数据在其他地方无法获取。
+
+通过 `ccost sl --per session --cost-diff` 可以看到，当 LiteLLM 定价准确时，从 `~/.claude/projects/` 计算的费用与 `statusline.jsonl` 中服务端返回的费用非常接近。statusline 的费用有时可能偏低，因为它不一定包含 subagent 的费用。由于 `~/.claude/projects/` 有完整的逐请求 token 明细，它可能是更可靠的费用来源。
+
+`statusline.jsonl` 的核心价值在于速率限制百分比，而非费用。因此 [Claude Code 仪表盘](https://github.com/toolsu/claude-code-dashboard) 使用的是从 `~/.claude/projects/` 计算的费用数据，结合 `statusline.jsonl` 中的5小时和1周速率限制百分比数据。
+
 ### 项目路径解码
 
 目录名如 `-home-user-workspace-test` 解码为 `/home/user/workspace/test`。
+
+## 截图
+
+### 终端输出
+
+![终端输出](https://raw.githubusercontent.com/toolsu/ccost/main/screenshot_terminal.png)
+
+### 状态栏分析（`ccost sl`）
+
+![状态栏输出](https://raw.githubusercontent.com/toolsu/ccost/main/screenshot_terminal_sl.png)
+
+### HTML 报告
+
+![HTML 报告](https://raw.githubusercontent.com/toolsu/ccost/main/screenshot_html.png)
 
 ## 开发
 

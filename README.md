@@ -1,21 +1,25 @@
-# ccost <img src="logo.svg" alt="ccost" width="35" />
+# ccost <img src="https://raw.githubusercontent.com/toolsu/ccost/main/logo.svg" alt="ccost" width="35" />
 
 Analyze Claude Code token usage and cost from your local conversation history.
 
-Reads JSONL files from `~/.claude/projects/` and `~/.config/claude/projects/`, deduplicates streaming entries, calculates costs using LiteLLM pricing, and outputs as table, JSON, Markdown, HTML, CSV, TSV, or braille chart.
+Reads JSONL files from `~/.claude/projects/`, deduplicates streaming entries, calculates costs using LiteLLM pricing, and outputs as table, JSON, Markdown, HTML, CSV, TSV, or braille chart (See [Screenshot](#screenshots)).
 
-The `ccost sl` subcommand analyzes `~/.claude/statusline.jsonl` for rate limit tracking, session summaries, budget estimation, and cost comparison.
+The [`ccost sl` subcommand](#statusline-analysis) analyzes `~/.claude/statusline.jsonl` for rate limit tracking, session summaries, budget estimation, and cost comparison (see [`ccost` vs `ccost sl`](#ccost-vs-ccost-sl)).
+
+Blazing fast CLI and library written in Rust with thorough tests. Also powers [Claude Code Dashboard](https://github.com/toolsu/claude-code-dashboard), a Tauri desktop app for visualizing your Claude Code usage and more.
 
 ## Install
 
 ```bash
-cargo install --path .
+npm i -g ccost
 ```
 
-Or run directly:
+Or download prebuilt binaries from [GitHub Releases](https://github.com/toolsu/ccost/releases).
+
+Or via Cargo (compiles from source):
 
 ```bash
-cargo run --release -- [options]
+cargo install ccost
 ```
 
 ## Quick Start
@@ -108,11 +112,23 @@ Granularity auto-selects based on range (hour/day/month). Only `--output txt` wo
 
 ## Statusline Analysis
 
-`ccost sl` command can analyze `~/.claude/statusline.jsonl`, a file produced by a Claude Code statusline hook that snapshots rate limits, cost, duration, and context window usage on every action.
+`ccost sl` command can analyze `~/.claude/statusline.jsonl`, a file produced by a Claude Code statusline hook that snapshots rate limits, cost, duration, and context window usage on every action (see [`ccost` vs `ccost sl`](#ccost-vs-ccost-sl)).
 
-### Setup
+### Setup for statusline.jsonl
 
-Add to `~/.claude/settings.json`:
+#### Automatic Setup
+
+Run in Claude Code on any OS:
+
+```
+/statusline Set up a command-type statusline using ~/.claude/statusline.sh (or ~/.claude/statusline.ps1 on Windows). The script should read stdin and append {"ts":<unix_epoch>,"data":<stdin_json>} to ~/.claude/statusline.jsonl. Create the script and configure settings.json.
+```
+
+#### Manual Setup
+
+##### Linux, macOS, WSL
+
+Or set it up manually: add to `~/.claude/settings.json`:
 
 ```json
   "statusLine": {
@@ -134,6 +150,26 @@ chmod +x ~/.claude/statusline.sh
 ```
 
 If you already have a statusline script, just append the `echo` line.
+
+##### Windows (PowerShell)
+
+Add to `~/.claude/settings.json`:
+
+```json
+  "statusLine": {
+    "type": "command",
+    "command": "powershell -NoProfile -File ~/.claude/statusline.ps1"
+  }
+```
+
+Create `~/.claude/statusline.ps1`:
+
+```powershell
+$input = $Input | Out-String
+$ts = [int](New-TimeSpan -Start (Get-Date '1970-01-01') -End (Get-Date).ToUniversalTime()).TotalSeconds
+$line = "{""ts"":$ts,""data"":" + $input.Trim() + "}"
+Add-Content -Path "$env:USERPROFILE\.claude\statusline.jsonl" -Value $line -Encoding UTF8
+```
 
 ### View Modes
 
@@ -355,17 +391,35 @@ Per-record cost via model-to-price lookup:
 
 Bundled at compile time from LiteLLM. Use `--live-pricing` for latest or `--pricing-data` for custom.
 
-### Cost Accuracy: `ccost` vs `ccost sl`
+### `ccost` vs `ccost sl`
 
-`ccost` (main command) computes cost from per-request token counts in JSONL files using LiteLLM pricing. `ccost sl` reads cumulative cost from Claude Code's statusline, which uses its own internal pricing.
+Below we'll compare `ccost` (data from `~/.claude/projects/`) and `ccost sl` (data from `statusline.jsonl`).
 
-The cost reported by `ccost sl` comes from the server and is therefore the official figure. However, it depends on Claude Code's cumulative `total_cost_usd`, which may not always include subagent costs and may also carry over inherited values from continued sessions. As a result, when pricing data are accurate, `ccost` may produce a more accurate cost estimate than `ccost sl`.
+`~/.claude/projects/` contains per-request JSONL logs with detailed token counts (input, output, cache creation, cache read) for every API call. `ccost` computes cost from these counts using LiteLLM pricing.
 
-Use `ccost sl --per session --cost-diff` to compare the two side by side.
+`~/.claude/statusline.jsonl` contains periodic snapshots from Claude Code's statusline, including the server-reported cumulative cost and the 5-hour and 1-week rate-limit usage percentages, which are not available anywhere else.
+
+As shown by `ccost sl --per session --cost-diff`, when LiteLLM pricing is accurate, the cost computed from `~/.claude/projects/` closely matches the server-reported cost in `statusline.jsonl`. The statusline cost may occasionally undercount because it does not always include subagent costs. Since `~/.claude/projects/` has full per-request token breakdowns, it may be the more reliable source for cost.
+
+The primary value of `statusline.jsonl` is the rate-limit percentages, not cost. This is why [Claude Code Dashboard](https://github.com/toolsu/claude-code-dashboard) uses cost data computed from `~/.claude/projects/` combined with the 5-hour and 1-week rate-limit percentages from `statusline.jsonl`.
 
 ### Project Path Decoding
 
 Directory names like `-home-user-workspace-test` decode to `/home/user/workspace/test`.
+
+## Screenshots
+
+### Terminal
+
+![Terminal output](https://raw.githubusercontent.com/toolsu/ccost/main/screenshot_terminal.png)
+
+### Statusline Analysis (`ccost sl`)
+
+![Statusline output](https://raw.githubusercontent.com/toolsu/ccost/main/screenshot_terminal_sl.png)
+
+### HTML Report
+
+![HTML report](https://raw.githubusercontent.com/toolsu/ccost/main/screenshot_html.png)
 
 ## Development
 

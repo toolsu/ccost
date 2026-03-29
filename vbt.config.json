@@ -1,5 +1,7 @@
 {
   "manifest": "Cargo.toml",
   "push": true,
-  "preBumpCheck": "cargo fmt --check && cargo clippy -- -W clippy::all && cargo test"
+  "preBumpCheck": "cargo fmt --check && cargo clippy -- -W clippy::all && cargo test",
+  "postVerRepl": "node -e \"require('fs').copyFileSync('README.md','npm/README.md')\"",
+  "commitFiles": ["npm/README.md"]
 }

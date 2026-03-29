@@ -42,6 +42,16 @@ fn format_date_in_tz(dt: &DateTime<Utc>, tz: &ResolvedTz) -> String {
     }
 }
 
+fn format_datetime_in_tz(dt: &DateTime<Utc>, tz: &ResolvedTz) -> String {
+    let fmt = "%Y-%m-%dT%H:%M:%S";
+    match tz {
+        ResolvedTz::Local => dt.with_timezone(&Local).format(fmt).to_string(),
+        ResolvedTz::Utc => dt.format(fmt).to_string(),
+        ResolvedTz::Fixed(off) => dt.with_timezone(off).format(fmt).to_string(),
+        ResolvedTz::Iana(tz) => dt.with_timezone(tz).format(fmt).to_string(),
+    }
+}
+
 // ─── Segment detection helpers ────────────────────────────────────────────────
 
 /// Returns true if the transition from `prev` to `curr` is a reset boundary.
@@ -617,6 +627,53 @@ pub fn aggregate_windows(
     }
 
     result
+}
+
+/// Filter windows to only those overlapping with [from, to] range.
+///
+/// A window is kept if its time range overlaps with the filter range:
+/// - window_end > from (window doesn't end at or before range start)
+/// - window_start < to (window doesn't start at or after range end)
+///
+/// The from/to strings are compared in the given timezone, matching the
+/// format used by `load_sl_records` for record-level filtering.
+pub fn filter_windows_by_range(
+    windows: Vec<SlWindowSummary>,
+    from: &Option<String>,
+    to: &Option<String>,
+    tz: Option<&str>,
+) -> Vec<SlWindowSummary> {
+    if from.is_none() && to.is_none() {
+        return windows;
+    }
+    let resolved_tz = resolve_tz(tz);
+    let from_normalized = from.as_ref().map(|s| {
+        let n = s.replace(' ', "T");
+        if n.len() == 16 { format!("{}:00", n) } else { n }
+    });
+    let to_normalized = to.as_ref().map(|s| {
+        let n = s.replace(' ', "T");
+        if n.len() == 16 { format!("{}:00", n) } else { n }
+    });
+
+    windows
+        .into_iter()
+        .filter(|w| {
+            if let Some(ref from_val) = from_normalized {
+                let end_str = format_datetime_in_tz(&w.window_end, &resolved_tz);
+                if end_str.as_str() <= from_val.as_str() {
+                    return false;
+                }
+            }
+            if let Some(ref to_val) = to_normalized {
+                let start_str = format_datetime_in_tz(&w.window_start, &resolved_tz);
+                if start_str.as_str() >= to_val.as_str() {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect()
 }
 
 /// Group session summaries by project.

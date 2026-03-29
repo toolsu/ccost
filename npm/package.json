@@ -1,7 +1,7 @@
 {
   "name": "ccost",
   "version": "0.0.0",
-  "description": "Analyze Claude Code token usage and costs from local conversation history",
+  "description": "Analyze Claude Code token usage and costs from local conversation history (Rust CLI & lib)",
   "repository": {
     "type": "git",
     "url": "https://github.com/toolsu/ccost"
@@ -16,7 +16,8 @@
   },
   "files": [
     "install.js",
-    "run.js"
+    "run.js",
+    "README.md"
   ],
   "engines": {
     "node": ">=14"
