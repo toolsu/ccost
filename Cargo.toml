@@ -2,13 +2,14 @@
 name = "ccost"
 version = "0.0.4"
 edition = "2021"
-description = "Analyze Claude Code token usage and costs from local conversation history"
+description = "Analyze Claude Code token usage and costs from local conversation history (CLI & lib)"
 license = "MIT"
 repository = "https://github.com/toolsu/ccost"
 authors = ["Tom Chen"]
 keywords = ["claude", "token", "usage", "cost", "anthropic"]
 categories = ["command-line-utilities"]
 exclude = ["scripts/"]
+default-run = "ccost"
 
 [[bin]]
 name = "ccost"

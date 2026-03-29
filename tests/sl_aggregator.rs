@@ -1,7 +1,7 @@
 use ccost::sl::types::*;
 use ccost::sl::{
     aggregate_by_day, aggregate_by_project, aggregate_ratelimit, aggregate_sessions,
-    aggregate_windows, WindowType,
+    aggregate_windows, filter_windows_by_range, WindowType,
 };
 use chrono::{TimeZone, Utc};
 
@@ -1223,4 +1223,130 @@ fn test_day_aggregation_fixed_offset() {
 fn test_day_aggregation_empty() {
     let days = aggregate_by_day(&[], Some("UTC"));
     assert_eq!(days.len(), 0);
+}
+
+// ─── filter_windows_by_range ─────────────────────────────────────────────────
+
+/// Helper: build records spanning multiple 5h windows and return the aggregated windows.
+fn make_multi_window_records() -> (Vec<SlRecord>, Vec<SlWindowSummary>) {
+    // 2026-03-27T00:00:00Z = 1774569600
+    // Window A: resets_at 2026-03-27T13:00:00Z, start 08:00 UTC
+    // Window B: resets_at 2026-03-27T18:00:00Z, start 13:00 UTC
+    // Window C: resets_at 2026-03-27T23:00:00Z, start 18:00 UTC
+    let resets_a: i64 = 1774569600 + 13 * 3600; // 2026-03-27T13:00:00Z
+    let resets_b: i64 = 1774569600 + 18 * 3600; // 2026-03-27T18:00:00Z
+    let resets_c: i64 = 1774569600 + 23 * 3600; // 2026-03-27T23:00:00Z
+
+    let records = vec![
+        // Window A record (ts within 08:00–13:00)
+        make_record(
+            resets_a - 3600, "s1", "/proj/a", 0.1, 500, 200, 5, 2,
+            None, Some(10), Some(resets_a), Some(20), Some(resets_a + 604800),
+        ),
+        // Window B record (ts within 13:00–18:00)
+        make_record(
+            resets_b - 3600, "s2", "/proj/a", 0.2, 600, 250, 6, 3,
+            None, Some(20), Some(resets_b), Some(30), Some(resets_b + 604800),
+        ),
+        // Window C record (ts within 18:00–23:00)
+        make_record(
+            resets_c - 3600, "s3", "/proj/a", 0.3, 700, 300, 7, 4,
+            None, Some(30), Some(resets_c), Some(40), Some(resets_c + 604800),
+        ),
+    ];
+
+    let sessions = aggregate_sessions(&records);
+    let windows = aggregate_windows(&records, &sessions, WindowType::FiveHour, false);
+    (records, windows)
+}
+
+#[test]
+fn test_filter_windows_no_filters() {
+    let (_, windows) = make_multi_window_records();
+    assert_eq!(windows.len(), 3);
+
+    // No filters — all windows returned
+    let filtered = filter_windows_by_range(windows, &None, &None, Some("UTC"));
+    assert_eq!(filtered.len(), 3);
+}
+
+#[test]
+fn test_filter_windows_from_excludes_earlier() {
+    let (_, windows) = make_multi_window_records();
+    // --from 2026-03-27T18:00 should exclude windows ending at or before 18:00
+    // Window A: 08:00–13:00 → end 13:00 <= 18:00 → excluded
+    // Window B: 13:00–18:00 → end 18:00 <= 18:00 → excluded
+    // Window C: 18:00–23:00 → end 23:00 > 18:00 → kept
+    let from = Some("2026-03-27T18:00".to_string());
+    let filtered = filter_windows_by_range(windows, &from, &None, Some("UTC"));
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].window_start.timestamp(), 1774569600 + 18 * 3600); // 18:00 UTC
+}
+
+#[test]
+fn test_filter_windows_to_excludes_later() {
+    let (_, windows) = make_multi_window_records();
+    // --to 2026-03-27T13:00 should exclude windows starting at or after 13:00
+    // Window A: 08:00–13:00 → start 08:00 < 13:00 → kept
+    // Window B: 13:00–18:00 → start 13:00 >= 13:00 → excluded
+    // Window C: 18:00–23:00 → start 18:00 >= 13:00 → excluded
+    let to = Some("2026-03-27T13:00".to_string());
+    let filtered = filter_windows_by_range(windows, &None, &to, Some("UTC"));
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].window_end.timestamp(), 1774569600 + 13 * 3600); // 13:00 UTC
+}
+
+#[test]
+fn test_filter_windows_from_and_to() {
+    let (_, windows) = make_multi_window_records();
+    // --from 2026-03-27T12:00 --to 2026-03-27T19:00
+    // Window A: 08:00–13:00 → end 13:00 > 12:00 ✓, start 08:00 < 19:00 ✓ → kept
+    // Window B: 13:00–18:00 → end 18:00 > 12:00 ✓, start 13:00 < 19:00 ✓ → kept
+    // Window C: 18:00–23:00 → end 23:00 > 12:00 ✓, start 18:00 < 19:00 ✓ → kept
+    let from = Some("2026-03-27T12:00".to_string());
+    let to = Some("2026-03-27T19:00".to_string());
+    let filtered = filter_windows_by_range(windows, &from, &to, Some("UTC"));
+    assert_eq!(filtered.len(), 3);
+}
+
+#[test]
+fn test_filter_windows_narrow_range_keeps_overlapping() {
+    let (_, windows) = make_multi_window_records();
+    // --from 2026-03-27T14:00 --to 2026-03-27T17:00
+    // Only Window B (13:00–18:00) overlaps: end 18:00 > 14:00 ✓, start 13:00 < 17:00 ✓
+    // Window A: 08:00–13:00 → end 13:00 <= 14:00 → excluded
+    // Window C: 18:00–23:00 → start 18:00 >= 17:00 → excluded
+    let from = Some("2026-03-27T14:00".to_string());
+    let to = Some("2026-03-27T17:00".to_string());
+    let filtered = filter_windows_by_range(windows, &from, &to, Some("UTC"));
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].window_start.timestamp(), 1774569600 + 13 * 3600); // 13:00 UTC
+}
+
+#[test]
+fn test_filter_windows_timezone_aware() {
+    let (_, windows) = make_multi_window_records();
+    // In UTC+8, window times shift forward by 8 hours:
+    // Window A: 16:00–21:00 (UTC+8)
+    // Window B: 21:00–02:00+1 (UTC+8)
+    // Window C: 02:00–07:00+1 (UTC+8)
+    //
+    // --from 2026-03-27T22:00 in UTC+8 (= 14:00 UTC)
+    // Window A: end 21:00 <= 22:00 → excluded
+    // Window B: end 02:00+1 > 22:00 ✓ → kept
+    // Window C: end 07:00+1 > 22:00 ✓ → kept
+    let from = Some("2026-03-27T22:00".to_string());
+    let filtered = filter_windows_by_range(windows, &from, &None, Some("+08:00"));
+    assert_eq!(filtered.len(), 2);
+}
+
+#[test]
+fn test_filter_windows_empty_input() {
+    let filtered = filter_windows_by_range(
+        vec![],
+        &Some("2026-03-27T18:00".to_string()),
+        &None,
+        Some("UTC"),
+    );
+    assert_eq!(filtered.len(), 0);
 }

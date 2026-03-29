@@ -17,7 +17,8 @@ use ccost::formatters::table::TableOptions;
 use ccost::sl::formatter::*;
 use ccost::sl::{
     aggregate_by_day, aggregate_by_project, aggregate_ratelimit, aggregate_sessions,
-    aggregate_windows, load_sl_records, SlChartMode, SlCostDiff, SlLoadOptions, SlViewMode,
+    aggregate_windows, filter_windows_by_range, load_sl_records, SlChartMode, SlCostDiff,
+    SlLoadOptions, SlViewMode,
     WindowType,
 };
 use ccost::utils::{compute_date_range, copy_to_clipboard, ext_for_format, term_width};
@@ -1083,8 +1084,9 @@ fn run_sl(matches: &clap::ArgMatches) {
                     }
                     SlViewMode::Window1h => {
                         let sessions = aggregate_sessions(recs);
-                        let mut windows =
+                        let windows =
                             aggregate_windows(recs, &sessions, WindowType::OneHour, promo);
+                        let mut windows = filter_windows_by_range(windows, &effective_from, &effective_to, tz_opt.as_deref());
                         if desc {
                             windows.reverse();
                         }
@@ -1092,8 +1094,9 @@ fn run_sl(matches: &clap::ArgMatches) {
                     }
                     SlViewMode::Window5h => {
                         let sessions = aggregate_sessions(recs);
-                        let mut windows =
+                        let windows =
                             aggregate_windows(recs, &sessions, WindowType::FiveHour, promo);
+                        let mut windows = filter_windows_by_range(windows, &effective_from, &effective_to, tz_opt.as_deref());
                         if desc {
                             windows.reverse();
                         }
@@ -1101,8 +1104,9 @@ fn run_sl(matches: &clap::ArgMatches) {
                     }
                     SlViewMode::Window1w => {
                         let sessions = aggregate_sessions(recs);
-                        let mut windows =
+                        let windows =
                             aggregate_windows(recs, &sessions, WindowType::OneWeek, promo);
+                        let mut windows = filter_windows_by_range(windows, &effective_from, &effective_to, tz_opt.as_deref());
                         if desc {
                             windows.reverse();
                         }
@@ -1262,7 +1266,8 @@ fn generate_sl_table_content(
         }
         SlViewMode::Window1h => {
             let sessions = aggregate_sessions(records);
-            let mut windows = aggregate_windows(records, &sessions, WindowType::OneHour, promo);
+            let windows = aggregate_windows(records, &sessions, WindowType::OneHour, promo);
+            let mut windows = filter_windows_by_range(windows, effective_from, effective_to, opts.tz.as_deref());
             if desc {
                 windows.reverse();
             }
@@ -1270,7 +1275,8 @@ fn generate_sl_table_content(
         }
         SlViewMode::Window5h => {
             let sessions = aggregate_sessions(records);
-            let mut windows = aggregate_windows(records, &sessions, WindowType::FiveHour, promo);
+            let windows = aggregate_windows(records, &sessions, WindowType::FiveHour, promo);
+            let mut windows = filter_windows_by_range(windows, effective_from, effective_to, opts.tz.as_deref());
             if desc {
                 windows.reverse();
             }
@@ -1278,7 +1284,8 @@ fn generate_sl_table_content(
         }
         SlViewMode::Window1w => {
             let sessions = aggregate_sessions(records);
-            let mut windows = aggregate_windows(records, &sessions, WindowType::OneWeek, promo);
+            let windows = aggregate_windows(records, &sessions, WindowType::OneWeek, promo);
+            let mut windows = filter_windows_by_range(windows, effective_from, effective_to, opts.tz.as_deref());
             if desc {
                 windows.reverse();
             }
