@@ -18,8 +18,7 @@ use ccost::sl::formatter::*;
 use ccost::sl::{
     aggregate_by_day, aggregate_by_project, aggregate_ratelimit, aggregate_sessions,
     aggregate_windows, filter_windows_by_range, load_sl_records, SlChartMode, SlCostDiff,
-    SlLoadOptions, SlViewMode,
-    WindowType,
+    SlLoadOptions, SlViewMode, WindowType,
 };
 use ccost::utils::{compute_date_range, copy_to_clipboard, ext_for_format, term_width};
 use ccost::*;
@@ -1041,111 +1040,105 @@ fn run_sl(matches: &clap::ArgMatches) {
     // Non-chart mode: generate table/json/csv content based on view_mode
 
     // Helper to generate content for a given format string
-    let generate_sl_content =
-        |fmt: &str, view: &SlViewMode, recs: &[ccost::sl::SlRecord], color: bool| -> String {
-            let opts = SlFormatOptions {
-                tz: tz_opt.clone(),
-                price_mode,
-                compact,
-                color,
-            };
+    let generate_sl_content = |fmt: &str,
+                               view: &SlViewMode,
+                               recs: &[ccost::sl::SlRecord],
+                               color: bool|
+     -> String {
+        let opts = SlFormatOptions {
+            tz: tz_opt.clone(),
+            price_mode,
+            compact,
+            color,
+        };
 
-            match fmt {
-                "json" if !cost_diff => match view {
-                    SlViewMode::Action => {
-                        let mut entries = aggregate_ratelimit(recs);
-                        if desc {
-                            entries.reverse();
-                        }
-                        format_sl_json_ratelimit(&entries, &json_meta)
+        match fmt {
+            "json" if !cost_diff => match view {
+                SlViewMode::Action => {
+                    let mut entries = aggregate_ratelimit(recs);
+                    if desc {
+                        entries.reverse();
                     }
-                    SlViewMode::Session => {
-                        let mut sessions = aggregate_sessions(recs);
-                        if desc {
-                            sessions.reverse();
-                        }
-                        format_sl_json_sessions(&sessions, &json_meta)
-                    }
-                    SlViewMode::Project => {
-                        let sessions = aggregate_sessions(recs);
-                        let mut projects = aggregate_by_project(&sessions);
-                        if desc {
-                            projects.reverse();
-                        }
-                        format_sl_json_projects(&projects, &json_meta)
-                    }
-                    SlViewMode::Day => {
-                        let sessions = aggregate_sessions(recs);
-                        let mut days = aggregate_by_day(&sessions, tz_opt.as_deref());
-                        if desc {
-                            days.reverse();
-                        }
-                        format_sl_json_days(&days, &json_meta)
-                    }
-                    SlViewMode::Window1h => {
-                        let sessions = aggregate_sessions(recs);
-                        let windows =
-                            aggregate_windows(recs, &sessions, WindowType::OneHour, promo);
-                        let mut windows = filter_windows_by_range(windows, &effective_from, &effective_to, tz_opt.as_deref());
-                        if desc {
-                            windows.reverse();
-                        }
-                        format_sl_json_windows(&windows, &json_meta)
-                    }
-                    SlViewMode::Window5h => {
-                        let sessions = aggregate_sessions(recs);
-                        let windows =
-                            aggregate_windows(recs, &sessions, WindowType::FiveHour, promo);
-                        let mut windows = filter_windows_by_range(windows, &effective_from, &effective_to, tz_opt.as_deref());
-                        if desc {
-                            windows.reverse();
-                        }
-                        format_sl_json_windows(&windows, &json_meta)
-                    }
-                    SlViewMode::Window1w => {
-                        let sessions = aggregate_sessions(recs);
-                        let windows =
-                            aggregate_windows(recs, &sessions, WindowType::OneWeek, promo);
-                        let mut windows = filter_windows_by_range(windows, &effective_from, &effective_to, tz_opt.as_deref());
-                        if desc {
-                            windows.reverse();
-                        }
-                        format_sl_json_windows(&windows, &json_meta)
-                    }
-                },
-                // For json+cost-diff: use dedicated JSON formatter
-                "json" => {
+                    format_sl_json_ratelimit(&entries, &json_meta)
+                }
+                SlViewMode::Session => {
                     let mut sessions = aggregate_sessions(recs);
                     if desc {
                         sessions.reverse();
                     }
-                    let diffs =
-                        compute_cost_diffs(&sessions, matches, &effective_from, &effective_to);
-                    format_sl_json_cost_diff(&diffs, &json_meta)
+                    format_sl_json_sessions(&sessions, &json_meta)
                 }
-                // For csv, tsv, markdown, html: use generic table data
-                "csv" | "tsv" | "markdown" | "html" => {
-                    let (headers, rows, totals) = generate_sl_table_data(
-                        view,
-                        recs,
-                        &opts,
-                        cost_diff,
-                        promo,
-                        desc,
+                SlViewMode::Project => {
+                    let sessions = aggregate_sessions(recs);
+                    let mut projects = aggregate_by_project(&sessions);
+                    if desc {
+                        projects.reverse();
+                    }
+                    format_sl_json_projects(&projects, &json_meta)
+                }
+                SlViewMode::Day => {
+                    let sessions = aggregate_sessions(recs);
+                    let mut days = aggregate_by_day(&sessions, tz_opt.as_deref());
+                    if desc {
+                        days.reverse();
+                    }
+                    format_sl_json_days(&days, &json_meta)
+                }
+                SlViewMode::Window1h => {
+                    let sessions = aggregate_sessions(recs);
+                    let windows = aggregate_windows(recs, &sessions, WindowType::OneHour, promo);
+                    let mut windows = filter_windows_by_range(
+                        windows,
                         &effective_from,
                         &effective_to,
-                        matches,
+                        tz_opt.as_deref(),
                     );
-                    let totals_ref = totals.as_ref();
-                    match fmt {
-                        "csv" => render_csv(&headers, &rows, totals_ref),
-                        "tsv" => render_tsv(&headers, &rows, totals_ref),
-                        "markdown" => render_markdown(&headers, &rows, totals_ref),
-                        "html" => render_html(&headers, &rows, totals_ref),
-                        _ => unreachable!(),
+                    if desc {
+                        windows.reverse();
                     }
+                    format_sl_json_windows(&windows, &json_meta)
                 }
-                _ => generate_sl_table_content(
+                SlViewMode::Window5h => {
+                    let sessions = aggregate_sessions(recs);
+                    let windows = aggregate_windows(recs, &sessions, WindowType::FiveHour, promo);
+                    let mut windows = filter_windows_by_range(
+                        windows,
+                        &effective_from,
+                        &effective_to,
+                        tz_opt.as_deref(),
+                    );
+                    if desc {
+                        windows.reverse();
+                    }
+                    format_sl_json_windows(&windows, &json_meta)
+                }
+                SlViewMode::Window1w => {
+                    let sessions = aggregate_sessions(recs);
+                    let windows = aggregate_windows(recs, &sessions, WindowType::OneWeek, promo);
+                    let mut windows = filter_windows_by_range(
+                        windows,
+                        &effective_from,
+                        &effective_to,
+                        tz_opt.as_deref(),
+                    );
+                    if desc {
+                        windows.reverse();
+                    }
+                    format_sl_json_windows(&windows, &json_meta)
+                }
+            },
+            // For json+cost-diff: use dedicated JSON formatter
+            "json" => {
+                let mut sessions = aggregate_sessions(recs);
+                if desc {
+                    sessions.reverse();
+                }
+                let diffs = compute_cost_diffs(&sessions, matches, &effective_from, &effective_to);
+                format_sl_json_cost_diff(&diffs, &json_meta)
+            }
+            // For csv, tsv, markdown, html: use generic table data
+            "csv" | "tsv" | "markdown" | "html" => {
+                let (headers, rows, totals) = generate_sl_table_data(
                     view,
                     recs,
                     &opts,
@@ -1155,9 +1148,29 @@ fn run_sl(matches: &clap::ArgMatches) {
                     &effective_from,
                     &effective_to,
                     matches,
-                ),
+                );
+                let totals_ref = totals.as_ref();
+                match fmt {
+                    "csv" => render_csv(&headers, &rows, totals_ref),
+                    "tsv" => render_tsv(&headers, &rows, totals_ref),
+                    "markdown" => render_markdown(&headers, &rows, totals_ref),
+                    "html" => render_html(&headers, &rows, totals_ref),
+                    _ => unreachable!(),
+                }
             }
-        };
+            _ => generate_sl_table_content(
+                view,
+                recs,
+                &opts,
+                cost_diff,
+                promo,
+                desc,
+                &effective_from,
+                &effective_to,
+                matches,
+            ),
+        }
+    };
 
     // Handle --copy
     if let Some(ref copy_fmt) = copy_format {
@@ -1267,7 +1280,8 @@ fn generate_sl_table_content(
         SlViewMode::Window1h => {
             let sessions = aggregate_sessions(records);
             let windows = aggregate_windows(records, &sessions, WindowType::OneHour, promo);
-            let mut windows = filter_windows_by_range(windows, effective_from, effective_to, opts.tz.as_deref());
+            let mut windows =
+                filter_windows_by_range(windows, effective_from, effective_to, opts.tz.as_deref());
             if desc {
                 windows.reverse();
             }
@@ -1276,7 +1290,8 @@ fn generate_sl_table_content(
         SlViewMode::Window5h => {
             let sessions = aggregate_sessions(records);
             let windows = aggregate_windows(records, &sessions, WindowType::FiveHour, promo);
-            let mut windows = filter_windows_by_range(windows, effective_from, effective_to, opts.tz.as_deref());
+            let mut windows =
+                filter_windows_by_range(windows, effective_from, effective_to, opts.tz.as_deref());
             if desc {
                 windows.reverse();
             }
@@ -1285,7 +1300,8 @@ fn generate_sl_table_content(
         SlViewMode::Window1w => {
             let sessions = aggregate_sessions(records);
             let windows = aggregate_windows(records, &sessions, WindowType::OneWeek, promo);
-            let mut windows = filter_windows_by_range(windows, effective_from, effective_to, opts.tz.as_deref());
+            let mut windows =
+                filter_windows_by_range(windows, effective_from, effective_to, opts.tz.as_deref());
             if desc {
                 windows.reverse();
             }

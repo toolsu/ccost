@@ -649,11 +649,19 @@ pub fn filter_windows_by_range(
     let resolved_tz = resolve_tz(tz);
     let from_normalized = from.as_ref().map(|s| {
         let n = s.replace(' ', "T");
-        if n.len() == 16 { format!("{}:00", n) } else { n }
+        if n.len() == 16 {
+            format!("{}:00", n)
+        } else {
+            n
+        }
     });
     let to_normalized = to.as_ref().map(|s| {
         let n = s.replace(' ', "T");
-        if n.len() == 16 { format!("{}:00", n) } else { n }
+        if n.len() == 16 {
+            format!("{}:00", n)
+        } else {
+            n
+        }
     });
 
     windows
