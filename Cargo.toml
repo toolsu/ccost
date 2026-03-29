@@ -1,6 +1,6 @@
 [package]
 name = "ccost"
-version = "0.0.4"
+version = "0.1.0"
 edition = "2021"
 description = "Analyze Claude Code token usage and costs from local conversation history (CLI & lib)"
 license = "MIT"
