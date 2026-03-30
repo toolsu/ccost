@@ -6,7 +6,7 @@
 
 [`ccost sl` 子命令](#状态栏数据分析ccost-sl)（请先[配置 statusline.jsonl](#配置-statuslinejsonl)）分析 `~/.claude/statusline.jsonl`，用于速率限制追踪、会话汇总、预算估算和费用对比（参见 [`ccost` 与 `ccost sl` 的对比](#ccost-与-ccost-sl)）。
 
-使用 Rust 编写，速度极快，测试完善。同时也是 [Claude Code 仪表盘](https://github.com/toolsu/claude-code-dashboard)（一个 Tauri 桌面应用）的底层库。
+使用 Rust 编写，速度极快，测试完善。同时也是 [CC仪表盘（Claude Code 仪表盘）](https://github.com/toolsu/ccdashboard)（一个 Tauri 桌面应用）的底层库。
 
 [![crates.io](https://img.shields.io/crates/v/ccost)](https://crates.io/crates/ccost) [![npm](https://img.shields.io/npm/v/ccost)](https://www.npmjs.com/package/ccost) [![CI](https://github.com/toolsu/ccost/actions/workflows/ci.yml/badge.svg)](https://github.com/toolsu/ccost/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-brightgreen)](https://github.com/toolsu/ccost/blob/main/LICENSE)
 
@@ -403,7 +403,7 @@ struct GroupedData {
 
 通过 `ccost sl --per session --cost-diff` 可以看到，当 LiteLLM 定价准确时，从 `~/.claude/projects/` 计算的费用与 `statusline.jsonl` 中服务端返回的费用非常接近。statusline 的费用有时可能偏低，因为它不一定包含 subagent 的费用。由于 `~/.claude/projects/` 有完整的逐请求 token 明细，它可能是更可靠的费用来源。
 
-`statusline.jsonl` 的核心价值在于速率限制百分比，而非费用。因此 [Claude Code 仪表盘](https://github.com/toolsu/claude-code-dashboard) 使用的是从 `~/.claude/projects/` 计算的费用数据，结合 `statusline.jsonl` 中的5小时和1周速率限制百分比数据。
+`statusline.jsonl` 的核心价值在于速率限制百分比，而非费用。因此 [Claude Code 仪表盘](https://github.com/toolsu/ccdashboard) 使用的是从 `~/.claude/projects/` 计算的费用数据，结合 `statusline.jsonl` 中的5小时和1周速率限制百分比数据。
 
 ### 项目路径解码
 
