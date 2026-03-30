@@ -34,7 +34,7 @@ use ccost::sl::{
 use ccost::utils::{compute_date_range, copy_to_clipboard, ext_for_format, term_width};
 use ccost::*;
 
-const VERSION: &str = "1.0.0";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 type ChartData = (Vec<String>, Vec<f64>, String, fn(f64) -> String);
 
@@ -66,7 +66,7 @@ Options:
   --chart <mode>        Chart mode: cost, token
   --copy <format>       Copy to clipboard: json, markdown, html, txt, csv, tsv
   --help                Show this help
-  --version             Show version
+  -v, --version         Show version
 
 Subcommands:
   sl                    Analyze Claude statusline data (rate limits, sessions, costs)"#;
@@ -121,7 +121,7 @@ fn build_command() -> Command {
         .arg(
             Arg::new("version")
                 .long("version")
-                .short('V')
+                .short('v')
                 .action(ArgAction::SetTrue),
         )
         .subcommand(build_sl_subcommand())
@@ -200,7 +200,7 @@ fn main() {
 
     // Handle --version
     if matches.get_flag("version") {
-        println!("ccost v{}", VERSION);
+        println!("{}", VERSION);
         process::exit(0);
     }
 
