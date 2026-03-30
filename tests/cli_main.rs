@@ -92,7 +92,7 @@ fn test_version_flag() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("ccost v1.0.0"));
+        .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
 }
 
 // ─── 3. Terminal table output with --tz UTC ──────────────────────────────────
