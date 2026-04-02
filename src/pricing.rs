@@ -22,7 +22,15 @@ pub fn load_pricing() -> PricingData {
 /// Load pricing data from a user-provided JSON file path.
 pub fn load_pricing_from_file(file_path: &str) -> Result<PricingData, Box<dyn std::error::Error>> {
     let contents = fs::read_to_string(file_path)?;
-    let pricing: PricingData = serde_json::from_str(&contents)?;
+    let user: PricingData = serde_json::from_str(&contents)?;
+    let mut pricing = load_pricing(); // start from bundled defaults
+    // user overrides take precedence
+    for (key, value) in user.models {
+        pricing.models.insert(key, value);
+    }
+    if !user.fetched_at.is_empty() {
+        pricing.fetched_at = user.fetched_at;
+    }
     Ok(pricing)
 }
 
@@ -298,7 +306,8 @@ mod tests {
     }
 
     #[test]
-    fn test_load_pricing_from_file_valid() {
+    fn test_load_pricing_from_file_merges_with_bundled() {
+        let bundled = load_pricing();
         let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("pricing.json");
         let json = serde_json::json!({
@@ -317,8 +326,39 @@ mod tests {
         let result = load_pricing_from_file(path.to_str().unwrap());
         assert!(result.is_ok());
         let pricing = result.unwrap();
-        assert_eq!(pricing.models.len(), 1);
+        // user model is present
         assert!(pricing.models.contains_key("claude-test-1"));
+        // bundled models are also present
+        assert!(
+            pricing.models.len() > 1,
+            "should include bundled models + user model"
+        );
+        assert_eq!(pricing.models.len(), bundled.models.len() + 1);
+        // user fetchedAt overrides bundled
+        assert_eq!(pricing.fetched_at, "2026-01-01T00:00:00Z");
+    }
+
+    #[test]
+    fn test_load_pricing_from_file_without_fetched_at() {
+        let bundled = load_pricing();
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("pricing.json");
+        let json = serde_json::json!({
+            "models": {
+                "claude-test-1": {
+                    "inputCostPerToken": 0.001,
+                    "outputCostPerToken": 0.002,
+                    "cacheCreationCostPerToken": 0.0,
+                    "cacheReadCostPerToken": 0.0
+                }
+            }
+        });
+        std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
+
+        let pricing = load_pricing_from_file(path.to_str().unwrap()).unwrap();
+        assert!(pricing.models.contains_key("claude-test-1"));
+        // fetched_at falls back to bundled value
+        assert_eq!(pricing.fetched_at, bundled.fetched_at);
     }
 
     #[test]

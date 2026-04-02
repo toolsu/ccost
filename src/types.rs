@@ -86,6 +86,7 @@ pub struct ModelPricing {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PricingData {
+    #[serde(default)]
     pub fetched_at: String,
     pub models: HashMap<String, ModelPricing>,
 }
