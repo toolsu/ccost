@@ -23,8 +23,8 @@ pub fn load_pricing() -> PricingData {
 pub fn load_pricing_from_file(file_path: &str) -> Result<PricingData, Box<dyn std::error::Error>> {
     let contents = fs::read_to_string(file_path)?;
     let user: PricingData = serde_json::from_str(&contents)?;
-    let mut pricing = load_pricing(); // start from bundled defaults
-    // user overrides take precedence
+    let mut pricing = load_pricing();
+    // User overrides take precedence over bundled defaults
     for (key, value) in user.models {
         pricing.models.insert(key, value);
     }
