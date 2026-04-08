@@ -46,7 +46,7 @@ ccost sl --chart 5h                      # rate limit chart
 
 | Flag | Description |
 |------|-------------|
-| `--per <dim>` | Group by: `day`, `hour`, `month`, `session`, `project`, `model`, `subagent`. Up to 2 for nested grouping. Default: `--per day --per model`. |
+| `--per <dim>` | Group by: `day`, `hour`, `month`, `session`, `project`, `model`, `subagent`, `tool`, `line`. Up to 2 for nested grouping. Default: `--per day --per model`. |
 | `--order <order>` | Sort: `asc` (default) or `desc`. |
 
 Two-level grouping creates parent-child rows, e.g. `--per day --per model` shows each day with per-model breakdowns.
@@ -274,6 +274,12 @@ ccost --per subagent --cost decimal
 # Session > subagent: see subagent cost within each session
 ccost --per session --per subagent
 
+# Tool cost breakdown: which tools consume the most tokens
+ccost --per tool --cost decimal
+
+# Per-line cost: cost of each JSONL line (user prompt / assistant response)
+ccost --per session --per line
+
 # Copy JSON to clipboard
 ccost --copy json
 
@@ -387,6 +393,10 @@ Reads JSONL conversation logs from Claude Code's local storage:
 - `~/.config/claude/projects/*/` (alternate location)
 
 Both are scanned and deduplicated via symlink detection. Subagent transcripts are found in both the old (`<project>/subagents/`) and new (`<project>/<session-uuid>/subagents/`) directory structures. Each record carries an `agent_id` (the subagent file stem, or empty for the main session), enabling `--per subagent` grouping.
+
+### Tool & Line Extraction
+
+Each record's `message.content` is parsed with lightweight deserialization (only `type` and `name` fields from content blocks; `input`, `text`, etc. are skipped for performance). Tool names are extracted from `tool_use` blocks in assistant messages, enabling `--per tool` grouping. Each record also carries its JSONL line number (1-based), enabling `--per line` grouping. Line numbers are consistent with ccfriend's transcript line anchors (`#N`).
 
 ### Deduplication
 

@@ -2511,3 +2511,198 @@ fn test_two_level_session_subagent_grouping() {
     assert!(child_labels.contains(&"(main)"));
     assert!(child_labels.contains(&"agent-abc"));
 }
+
+// ---------------------------------------------------------------------------
+// Per-tool grouping
+// ---------------------------------------------------------------------------
+
+/// Build a mock assistant record with tool_use blocks.
+fn mock_rec_with_tools(
+    model: &str,
+    input: u64,
+    output: u64,
+    ts: &str,
+    req_id: &str,
+    msg_id: &str,
+    tools: &[&str],
+) -> serde_json::Value {
+    let mut content: Vec<serde_json::Value> = tools
+        .iter()
+        .enumerate()
+        .map(|(i, name)| {
+            serde_json::json!({
+                "type": "tool_use",
+                "id": format!("toolu_{:04}", i),
+                "name": name,
+                "input": {}
+            })
+        })
+        .collect();
+    // Also add a text block to be realistic
+    content.push(serde_json::json!({"type": "text", "text": "some response"}));
+
+    serde_json::json!({
+        "timestamp": ts,
+        "type": "assistant",
+        "sessionId": "session-abc",
+        "message": {
+            "id": msg_id,
+            "role": "assistant",
+            "model": model,
+            "content": content,
+            "usage": {
+                "input_tokens": input,
+                "output_tokens": output,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+            }
+        },
+        "requestId": req_id,
+    })
+}
+
+/// Mock user text message (line boundary, no usage).
+fn mock_user_text(ts: &str, text: &str) -> serde_json::Value {
+    serde_json::json!({
+        "timestamp": ts,
+        "type": "user",
+        "message": { "role": "user", "content": text }
+    })
+}
+
+/// Mock user tool_result message (no usage).
+fn mock_user_tool_result(ts: &str, tool_use_id: &str) -> serde_json::Value {
+    serde_json::json!({
+        "timestamp": ts,
+        "type": "user",
+        "message": {
+            "role": "user",
+            "content": [{"type": "tool_result", "tool_use_id": tool_use_id, "content": "ok"}]
+        }
+    })
+}
+
+#[test]
+fn test_per_tool_grouping() {
+    let records = vec![
+        // text-only assistant message
+        mock_rec("claude-opus-4-6", 1000, 500, 0, 0, "2026-01-15T10:00:00Z", "r1", "m1"),
+        // assistant using Read
+        mock_rec_with_tools("claude-opus-4-6", 2000, 800, "2026-01-15T10:01:00Z", "r2", "m2", &["Read"]),
+        // assistant using Edit
+        mock_rec_with_tools("claude-opus-4-6", 1500, 600, "2026-01-15T10:02:00Z", "r3", "m3", &["Edit"]),
+        // assistant using Read again
+        mock_rec_with_tools("claude-opus-4-6", 3000, 1000, "2026-01-15T10:03:00Z", "r4", "m4", &["Read"]),
+    ];
+
+    let dir = make_fixture(&records);
+    let opts = default_load_opts(dir.path());
+    let loaded = load_records(&opts);
+    assert_eq!(loaded.records.len(), 4);
+
+    let priced = calculate_cost(&loaded.records, None);
+    let dims = vec![GroupDimension::Tool];
+    let grouped = group_records(&priced, &dims, Some(&default_group_opts()));
+
+    // Should have 3 groups: (text), Edit, Read
+    assert_eq!(grouped.data.len(), 3);
+    let labels: Vec<&str> = grouped.data.iter().map(|g| g.label.as_str()).collect();
+    assert!(labels.contains(&"(text)"));
+    assert!(labels.contains(&"Edit"));
+    assert!(labels.contains(&"Read"));
+
+    // Read group should have 2 records worth of tokens
+    let read_group = grouped.data.iter().find(|g| g.label == "Read").unwrap();
+    assert_eq!(read_group.input_tokens, 2000 + 3000);
+    assert_eq!(read_group.output_tokens, 800 + 1000);
+}
+
+#[test]
+fn test_per_tool_multi_tool_message() {
+    let records = vec![
+        mock_rec_with_tools("claude-opus-4-6", 1000, 500, "2026-01-15T10:00:00Z", "r1", "m1", &["Read", "Edit"]),
+    ];
+
+    let dir = make_fixture(&records);
+    let opts = default_load_opts(dir.path());
+    let loaded = load_records(&opts);
+    assert_eq!(loaded.records.len(), 1);
+    // tool_names should be sorted alphabetically
+    assert_eq!(loaded.records[0].tool_names, "Edit, Read");
+}
+
+// ---------------------------------------------------------------------------
+// Per-line grouping
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_per_line_grouping() {
+    let records = vec![
+        // Turn 1: user prompt → assistant response → tool result → assistant response
+        mock_user_text("2026-01-15T10:00:00Z", "fix the bug"),
+        mock_rec_with_tools("claude-opus-4-6", 1000, 500, "2026-01-15T10:00:01Z", "r1", "m1", &["Read"]),
+        mock_user_tool_result("2026-01-15T10:00:02Z", "toolu_0000"),
+        mock_rec("claude-opus-4-6", 2000, 800, 0, 0, "2026-01-15T10:00:03Z", "r2", "m2"),
+        // Turn 2: user prompt → assistant response
+        mock_user_text("2026-01-15T10:01:00Z", "now refactor it"),
+        mock_rec_with_tools("claude-opus-4-6", 3000, 1200, "2026-01-15T10:01:01Z", "r3", "m3", &["Edit"]),
+    ];
+
+    let dir = make_fixture(&records);
+    let opts = default_load_opts(dir.path());
+    let loaded = load_records(&opts);
+    // Only assistant messages with usage should be loaded (4 total, 2 user-text and 1 user-tool-result have no usage)
+    assert_eq!(loaded.records.len(), 3);
+
+    // Check line assignment — line is the record's own JSONL line number (1-based)
+    // JSONL line 1: user text (no usage, not loaded)
+    // JSONL line 2: assistant (usage) → line=2
+    // JSONL line 3: user tool_result (no usage, not loaded)
+    // JSONL line 4: assistant (usage) → line=4
+    // JSONL line 5: user text (no usage, not loaded)
+    // JSONL line 6: assistant (usage) → line=6
+    assert_eq!(loaded.records[0].line, 2);
+    assert_eq!(loaded.records[1].line, 4);
+    assert_eq!(loaded.records[2].line, 6);
+
+    let priced = calculate_cost(&loaded.records, None);
+    let dims = vec![GroupDimension::Line];
+    let grouped = group_records(&priced, &dims, Some(&default_group_opts()));
+
+    // 3 records at lines 2, 4, 6 — each is its own group
+    assert_eq!(grouped.data.len(), 3);
+    let labels: Vec<&str> = grouped.data.iter().map(|g| g.label.as_str()).collect();
+    assert!(labels.contains(&"#2"));
+    assert!(labels.contains(&"#4"));
+    assert!(labels.contains(&"#6"));
+
+    let l2 = grouped.data.iter().find(|g| g.label == "#2").unwrap();
+    assert_eq!(l2.input_tokens, 1000);
+
+    let l6 = grouped.data.iter().find(|g| g.label == "#6").unwrap();
+    assert_eq!(l6.input_tokens, 3000);
+}
+
+#[test]
+fn test_per_session_per_tool_two_level() {
+    let records = vec![
+        mock_rec_with_tools("claude-opus-4-6", 1000, 500, "2026-01-15T10:00:00Z", "r1", "m1", &["Read"]),
+        mock_rec_with_tools("claude-opus-4-6", 2000, 800, "2026-01-15T10:01:00Z", "r2", "m2", &["Edit"]),
+    ];
+
+    let dir = make_fixture(&records);
+    let opts = default_load_opts(dir.path());
+    let loaded = load_records(&opts);
+    let priced = calculate_cost(&loaded.records, None);
+
+    let dims = vec![GroupDimension::Session, GroupDimension::Tool];
+    let grouped = group_records(&priced, &dims, Some(&default_group_opts()));
+
+    // One session group
+    assert_eq!(grouped.data.len(), 1);
+    let children = grouped.data[0].children.as_ref().unwrap();
+    assert_eq!(children.len(), 2);
+    let child_labels: Vec<&str> = children.iter().map(|c| c.label.as_str()).collect();
+    assert!(child_labels.contains(&"Edit"));
+    assert!(child_labels.contains(&"Read"));
+}

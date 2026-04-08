@@ -852,3 +852,588 @@ fn test_sl_action_cost_total() {
         total_line
     );
 }
+
+// ─── 28. --per 1h --output json ───────────────────────────────────────────────
+
+#[test]
+fn test_sl_per_1h_json() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "1h",
+            "--output",
+            "json",
+            "--filename",
+            "-",
+        ])
+        .output()
+        .expect("run command");
+
+    assert!(
+        output.status.success(),
+        "sl --per 1h --output json should succeed"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("stdout should be valid JSON");
+
+    assert_eq!(
+        parsed["meta"]["source"].as_str().unwrap_or(""),
+        "ccost-sl",
+        "meta.source should be 'ccost-sl'"
+    );
+    assert_eq!(
+        parsed["meta"]["view"].as_str().unwrap_or(""),
+        "1h",
+        "meta.view should be '1h'"
+    );
+    assert!(
+        parsed["data"].is_array(),
+        "JSON output should have 'data' array"
+    );
+}
+
+// ─── 29. --per project --output json ─────────────────────────────────────────
+
+#[test]
+fn test_sl_per_project_json() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "project",
+            "--output",
+            "json",
+            "--filename",
+            "-",
+        ])
+        .output()
+        .expect("run command");
+
+    assert!(
+        output.status.success(),
+        "sl --per project --output json should succeed"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("stdout should be valid JSON");
+
+    assert_eq!(
+        parsed["meta"]["view"].as_str().unwrap_or(""),
+        "project",
+        "meta.view should be 'project'"
+    );
+    assert!(
+        parsed["data"].is_array(),
+        "JSON output should have 'data' array"
+    );
+    assert!(
+        !parsed["data"].as_array().unwrap().is_empty(),
+        "data array should not be empty"
+    );
+}
+
+// ─── 30. --per day --output json ──────────────────────────────────────────────
+
+#[test]
+fn test_sl_per_day_json() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "day",
+            "--output",
+            "json",
+            "--filename",
+            "-",
+        ])
+        .output()
+        .expect("run command");
+
+    assert!(
+        output.status.success(),
+        "sl --per day --output json should succeed"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("stdout should be valid JSON");
+
+    assert_eq!(
+        parsed["meta"]["view"].as_str().unwrap_or(""),
+        "day",
+        "meta.view should be 'day'"
+    );
+    assert!(
+        parsed["data"].is_array(),
+        "JSON output should have 'data' array"
+    );
+    assert!(
+        !parsed["data"].as_array().unwrap().is_empty(),
+        "data array should not be empty"
+    );
+}
+
+// ─── 31. --per session --table compact ───────────────────────────────────────
+
+#[test]
+fn test_sl_per_session_compact() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args([
+            "sl", "--file", path, "--per", "session", "--table", "compact",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("TOTAL"));
+}
+
+// ─── 32. --per action --table compact ────────────────────────────────────────
+
+#[test]
+fn test_sl_per_action_compact() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args([
+            "sl", "--file", path, "--per", "action", "--table", "compact",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("TOTAL"))
+        .stdout(predicate::str::contains("5h%"));
+}
+
+// ─── 33. --output csv ─────────────────────────────────────────────────────────
+
+#[test]
+fn test_sl_output_csv() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "session",
+            "--output",
+            "csv",
+            "--filename",
+            "-",
+        ])
+        .output()
+        .expect("run command");
+
+    assert!(output.status.success(), "sl --output csv should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let first_line = stdout
+        .lines()
+        .next()
+        .expect("should have at least one line");
+    assert!(
+        first_line.contains(','),
+        "CSV output should be comma-separated"
+    );
+    assert!(
+        first_line.contains("Session"),
+        "CSV header should contain 'Session'"
+    );
+    assert!(stdout.contains("TOTAL"), "CSV should have TOTAL row");
+}
+
+// ─── 34. --per 5h --nopromo ───────────────────────────────────────────────────
+
+#[test]
+fn test_sl_nopromo_with_5h() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "5h", "--nopromo"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Est 5h Budg"))
+        .stdout(predicate::str::contains("TOTAL"));
+}
+
+// ─── 35. --tz UTC ─────────────────────────────────────────────────────────────
+
+#[test]
+fn test_sl_timezone_utc() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "session", "--tz", "UTC"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("TOTAL"));
+}
+
+// ─── 36. --model filter ───────────────────────────────────────────────────────
+
+#[test]
+fn test_sl_model_filter() {
+    // Create a file with two sessions using different models
+    let sess1 = "sess-model-filter-0000000000000a";
+    let sess2 = "sess-model-filter-0000000000000b";
+    let t = 1774483200_i64;
+
+    // sess1 uses default model (opus-4-6); sess2 uses a different model id
+    // Note: make_sl_line hardcodes model as "claude-opus-4-6[1m]"; we cannot override it here.
+    // We filter by "opus" which matches both sessions — filter only confirms command succeeds.
+    // Instead use a session filter to show model filter path is exercised.
+    let lines: Vec<String> = vec![
+        make_sl_line(
+            t + 10,
+            sess1,
+            0.5,
+            10000,
+            4000,
+            5,
+            2,
+            Some(2),
+            Some(50),
+            Some(1774497600),
+            Some(1774605600),
+        ),
+        make_sl_line(
+            t + 20,
+            sess2,
+            1.0,
+            20000,
+            8000,
+            10,
+            4,
+            Some(3),
+            Some(51),
+            Some(1774497600),
+            Some(1774605600),
+        ),
+    ];
+
+    let mut f = NamedTempFile::new().expect("create temp file");
+    for line in &lines {
+        writeln!(f, "{}", line).expect("write line");
+    }
+    let path = f.path().to_str().unwrap();
+
+    // Filter by "opus" — both sessions have "opus" in model name so both appear
+    let output = sl_cmd()
+        .args([
+            "sl", "--file", path, "--per", "session", "--model", "opus", "--cost", "decimal",
+        ])
+        .output()
+        .expect("run command");
+
+    assert!(output.status.success(), "sl --model filter should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("TOTAL"), "should have TOTAL row");
+}
+
+// ─── 37. --cost decimal mode ──────────────────────────────────────────────────
+
+#[test]
+fn test_sl_cost_decimal() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args([
+            "sl", "--file", path, "--per", "session", "--cost", "decimal",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("$"))
+        .stdout(predicate::str::contains("."))
+        .stdout(predicate::str::contains("TOTAL"));
+}
+
+// ─── 38. --output markdown --per session ──────────────────────────────────────
+
+#[test]
+fn test_sl_output_markdown_per_session() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "session",
+            "--output",
+            "markdown",
+            "--filename",
+            "-",
+        ])
+        .output()
+        .expect("run command");
+
+    assert!(
+        output.status.success(),
+        "sl --output markdown should succeed"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("| Session |"),
+        "markdown output should have Session header"
+    );
+    assert!(
+        stdout.contains("| :--- |"),
+        "markdown output should have alignment row"
+    );
+    assert!(
+        stdout.contains("**TOTAL**"),
+        "markdown output should have bold TOTAL"
+    );
+}
+
+// ─── 39. --cost-diff --output json ────────────────────────────────────────────
+
+/// Re-tests the cost-diff JSON path (already covered by test_sl_cost_diff_json above)
+/// but from a different angle: validate individual field presence in each data row.
+#[test]
+fn test_sl_cost_diff_json_fields() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "session",
+            "--cost-diff",
+            "--output",
+            "json",
+            "--filename",
+            "-",
+        ])
+        .output()
+        .expect("run command");
+
+    assert!(output.status.success(), "cost-diff JSON should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("should be valid JSON");
+
+    assert!(parsed["data"].is_array(), "should have data array");
+    assert!(parsed["totals"].is_object(), "should have totals object");
+    // Totals for cost-diff use camelCase keys: totalSlCost and matchedCount
+    let totals = &parsed["totals"];
+    assert!(
+        totals.get("totalSlCost").is_some(),
+        "totals should have 'totalSlCost' field"
+    );
+    assert!(
+        totals.get("matchedCount").is_some(),
+        "totals should have 'matchedCount' field"
+    );
+}
+
+// ─── 40. --per 1w --output json ───────────────────────────────────────────────
+
+#[test]
+fn test_sl_per_1w_json() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "1w",
+            "--output",
+            "json",
+            "--filename",
+            "-",
+        ])
+        .output()
+        .expect("run command");
+
+    assert!(
+        output.status.success(),
+        "sl --per 1w --output json should succeed"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("stdout should be valid JSON");
+
+    assert_eq!(
+        parsed["meta"]["view"].as_str().unwrap_or(""),
+        "1w",
+        "meta.view should be '1w'"
+    );
+    assert!(
+        parsed["data"].is_array(),
+        "JSON output should have 'data' array"
+    );
+}
+
+// ─── 41. --per action --output json ───────────────────────────────────────────
+
+#[test]
+fn test_sl_per_action_json() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "action",
+            "--output",
+            "json",
+            "--filename",
+            "-",
+        ])
+        .output()
+        .expect("run command");
+
+    assert!(
+        output.status.success(),
+        "sl --per action --output json should succeed"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("stdout should be valid JSON");
+
+    assert_eq!(
+        parsed["meta"]["view"].as_str().unwrap_or(""),
+        "action",
+        "meta.view should be 'action'"
+    );
+    assert!(
+        parsed["data"].is_array(),
+        "JSON output should have 'data' array"
+    );
+    assert!(
+        !parsed["data"].as_array().unwrap().is_empty(),
+        "action data array should not be empty"
+    );
+}
+
+// ─── 42. --table full shows all columns ───────────────────────────────────────
+
+#[test]
+fn test_sl_table_full() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "session", "--table", "full"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("TOTAL"))
+        .stdout(predicate::str::contains("Cost"));
+}
+
+// ─── 43. --order asc produces earlier rows first ──────────────────────────────
+
+#[test]
+fn test_sl_order_asc() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let asc_output = sl_cmd()
+        .args(["sl", "--file", path, "--per", "5h", "--order", "asc"])
+        .output()
+        .expect("run asc");
+    let desc_output = sl_cmd()
+        .args(["sl", "--file", path, "--per", "5h", "--order", "desc"])
+        .output()
+        .expect("run desc");
+
+    assert!(asc_output.status.success(), "asc order should succeed");
+    assert!(desc_output.status.success(), "desc order should succeed");
+
+    let asc_str = String::from_utf8(asc_output.stdout).unwrap();
+    let desc_str = String::from_utf8(desc_output.stdout).unwrap();
+
+    // asc and desc should produce different output (rows are in different order)
+    assert_ne!(
+        asc_str, desc_str,
+        "asc and desc should produce different output"
+    );
+}
+
+// ─── 44. --tz fixed offset ────────────────────────────────────────────────────
+
+#[test]
+fn test_sl_timezone_fixed_offset() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    sl_cmd()
+        .args(["sl", "--file", path, "--per", "day", "--tz", "+08:00"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("TOTAL"));
+}
+
+// ─── 45. --output tsv --per session ───────────────────────────────────────────
+
+#[test]
+fn test_sl_output_tsv_per_session() {
+    let f = create_test_file();
+    let path = f.path().to_str().unwrap();
+
+    let output = sl_cmd()
+        .args([
+            "sl",
+            "--file",
+            path,
+            "--per",
+            "session",
+            "--output",
+            "tsv",
+            "--filename",
+            "-",
+        ])
+        .output()
+        .expect("run command");
+
+    assert!(
+        output.status.success(),
+        "sl --output tsv --per session should succeed"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let first_line = stdout
+        .lines()
+        .next()
+        .expect("should have at least one line");
+    assert!(
+        first_line.contains('\t'),
+        "TSV output should be tab-separated"
+    );
+    assert!(
+        first_line.contains("Session"),
+        "TSV header should contain 'Session'"
+    );
+}

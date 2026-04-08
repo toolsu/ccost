@@ -352,4 +352,129 @@ mod tests {
         assert!(parse_fixed_offset("").is_none());
         assert!(parse_fixed_offset("abc").is_none());
     }
+
+    #[test]
+    fn test_term_width_returns_positive() {
+        // term_width() should always return a positive value
+        // (from COLUMNS env, terminal size, or fallback 80).
+        let w = term_width();
+        assert!(w > 0);
+    }
+
+    #[test]
+    fn test_osc52_copy_succeeds() {
+        // osc52_copy writes an escape sequence to stderr and returns Ok(()).
+        assert!(osc52_copy("hello world").is_ok());
+    }
+
+    #[test]
+    fn test_compute_date_range_5h_to() {
+        // h5to_val sets the END; start is 5 hours earlier.
+        let (from, to) = compute_date_range(
+            None,
+            None,
+            None,
+            Some("2026-03-15T15:00:00".to_string()),
+            None,
+            None,
+        );
+        assert_eq!(from.unwrap(), "2026-03-15T10:00:00");
+        assert_eq!(to.unwrap(), "2026-03-15T15:00:00");
+    }
+
+    #[test]
+    fn test_compute_date_range_1w_from() {
+        // w1from_val sets the START; end is 7 days later.
+        let (from, to) = compute_date_range(
+            None,
+            None,
+            None,
+            None,
+            Some("2026-03-01T00:00:00".to_string()),
+            None,
+        );
+        assert_eq!(from.unwrap(), "2026-03-01T00:00:00");
+        assert_eq!(to.unwrap(), "2026-03-08T00:00:00");
+    }
+
+    #[test]
+    fn test_compute_date_range_invalid_5h_from_fallback() {
+        // Invalid date in h5from_val should fall back to from_val / to_val.
+        let (from, to) = compute_date_range(
+            Some("2026-03-01".to_string()),
+            Some("2026-03-31".to_string()),
+            Some("not-a-date".to_string()),
+            None,
+            None,
+            None,
+        );
+        assert_eq!(from.unwrap(), "2026-03-01");
+        assert_eq!(to.unwrap(), "2026-03-31");
+    }
+
+    #[test]
+    fn test_compute_date_range_invalid_5h_to_fallback() {
+        let (from, to) = compute_date_range(
+            Some("2026-03-01".to_string()),
+            Some("2026-03-31".to_string()),
+            None,
+            Some("bad-date".to_string()),
+            None,
+            None,
+        );
+        assert_eq!(from.unwrap(), "2026-03-01");
+        assert_eq!(to.unwrap(), "2026-03-31");
+    }
+
+    #[test]
+    fn test_compute_date_range_invalid_1w_from_fallback() {
+        let (from, to) = compute_date_range(
+            Some("2026-03-01".to_string()),
+            Some("2026-03-31".to_string()),
+            None,
+            None,
+            Some("bad-date".to_string()),
+            None,
+        );
+        assert_eq!(from.unwrap(), "2026-03-01");
+        assert_eq!(to.unwrap(), "2026-03-31");
+    }
+
+    #[test]
+    fn test_compute_date_range_invalid_1w_to_fallback() {
+        let (from, to) = compute_date_range(
+            Some("2026-03-01".to_string()),
+            Some("2026-03-31".to_string()),
+            None,
+            None,
+            None,
+            Some("bad-date".to_string()),
+        );
+        assert_eq!(from.unwrap(), "2026-03-01");
+        assert_eq!(to.unwrap(), "2026-03-31");
+    }
+
+    #[test]
+    fn test_base64_encode_three_bytes() {
+        // "abc" is exactly 3 bytes — encodes to 4 chars with no padding.
+        assert_eq!(base64_encode(b"abc"), "YWJj");
+    }
+
+    #[test]
+    fn test_base64_encode_longer() {
+        // "Hello, World!" encodes to the standard Base64 value.
+        assert_eq!(base64_encode(b"Hello, World!"), "SGVsbG8sIFdvcmxkIQ==");
+    }
+
+    #[test]
+    fn test_parse_fixed_offset_no_colon() {
+        // "+0530" has no colon separator — the function requires one.
+        assert!(parse_fixed_offset("+0530").is_none());
+    }
+
+    #[test]
+    fn test_parse_fixed_offset_utc_offset() {
+        let fo = parse_fixed_offset("+00:00").unwrap();
+        assert_eq!(fo.local_minus_utc(), 0);
+    }
 }

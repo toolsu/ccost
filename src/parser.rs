@@ -159,6 +159,22 @@ pub fn deduplicate_streaming(records: &[Value]) -> (Vec<Value>, DedupStats) {
 }
 
 /// Find the component after "projects" in the path. If it starts with `-`,
+/// Extract sorted unique tool names from message content tool_use blocks.
+fn extract_tool_names(msg: &RawMessage) -> String {
+    let blocks = match &msg.content {
+        Some(RawContent::Blocks(blocks)) => blocks,
+        _ => return String::new(),
+    };
+    let mut names: Vec<&str> = blocks
+        .iter()
+        .filter(|item| item.item_type.as_deref() == Some("tool_use"))
+        .filter_map(|item| item.name.as_deref())
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+    names.join(", ")
+}
+
 /// replace all `-` with `/` to decode the path. Otherwise return as-is.
 /// Return "unknown" if no "projects" segment.
 pub fn extract_project_name(file_path: &str) -> String {
@@ -274,6 +290,28 @@ struct RawUsage {
     cache_read_input_tokens: Option<u64>,
 }
 
+#[derive(Deserialize)]
+struct RawContentItem {
+    #[serde(default, rename = "type")]
+    item_type: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum RawContent {
+    Blocks(Vec<RawContentItem>),
+    #[allow(dead_code)]
+    Text(String),
+}
+
+impl Default for RawContent {
+    fn default() -> Self {
+        RawContent::Text(String::new())
+    }
+}
+
 #[derive(Deserialize, Default)]
 struct RawMessage {
     #[serde(default)]
@@ -286,6 +324,8 @@ struct RawMessage {
     created_at: Option<TimestampVal>,
     #[serde(default)]
     usage: Option<RawUsage>,
+    #[serde(default)]
+    content: Option<RawContent>,
 }
 
 #[derive(Deserialize, Default)]
@@ -517,6 +557,7 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
     struct ParsedFile {
         file_mtime: DateTime<Utc>,
         records: Vec<RawRecord>,
+        line_numbers: Vec<u32>,
         project: String,
         session_id: String,
         agent_id: String,
@@ -532,11 +573,15 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
                 .unwrap_or_else(|_| Utc::now());
 
             let mut records = Vec::new();
+            let mut line_numbers = Vec::new();
+            let mut line_number: u32 = 0;
+
             for line in content.lines() {
                 let line = line.trim();
                 if line.is_empty() {
                     continue;
                 }
+                line_number += 1;
 
                 let rec: RawRecord = match serde_json::from_str(line) {
                     Ok(r) => r,
@@ -568,6 +613,7 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
                     _ => continue,
                 }
 
+                line_numbers.push(line_number);
                 records.push(rec);
             }
 
@@ -582,6 +628,7 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
             Some(ParsedFile {
                 file_mtime,
                 records,
+                line_numbers,
                 project,
                 session_id,
                 agent_id,
@@ -591,11 +638,13 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
 
     // Flatten into contiguous structure
     let mut all_records: Vec<RawRecord> = Vec::new();
+    let mut all_line_numbers: Vec<u32> = Vec::new();
     let mut file_infos: Vec<FileInfo> = Vec::new();
 
     for pf in parsed_files {
         let start_idx = all_records.len();
         all_records.extend(pf.records);
+        all_line_numbers.extend(pf.line_numbers);
         let end_idx = all_records.len();
 
         file_infos.push(FileInfo {
@@ -782,12 +831,20 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
         models_set.insert(model_owned.clone());
         sessions_set.insert(fi.session_id.clone());
 
+        let tool_names = rec
+            .message
+            .as_ref()
+            .map(|m| extract_tool_names(m))
+            .unwrap_or_default();
+
         filtered_records.push(TokenRecord {
             timestamp: tr.timestamp,
             model: model_owned,
             session_id: fi.session_id.clone(),
             project: fi.project.clone(),
             agent_id: fi.agent_id.clone(),
+            tool_names,
+            line: all_line_numbers[tr.record_idx],
             input_tokens,
             output_tokens,
             cache_creation_tokens,
@@ -991,5 +1048,148 @@ mod tests {
     fn test_get_date_part() {
         assert_eq!(get_date_part("2025-01-15T10:30:00"), "2025-01-15");
         assert_eq!(get_date_part("short"), "short");
+    }
+
+    // ─── extract_timestamp – additional cases ────────────────────────────────
+
+    #[test]
+    fn test_extract_timestamp_top_level_numeric_millis() {
+        // Numeric timestamp > 1e12 interpreted as milliseconds
+        // 1705314600000 ms = 2024-01-15T10:30:00Z
+        let record: Value = serde_json::from_str(r#"{"createdAt": 1705314600000}"#).unwrap();
+        let ts = extract_timestamp(&record).unwrap();
+        assert_eq!(ts, Utc.with_ymd_and_hms(2024, 1, 15, 10, 30, 0).unwrap());
+    }
+
+    #[test]
+    fn test_extract_timestamp_top_level_numeric_seconds() {
+        // Numeric timestamp <= 1e12 interpreted as seconds
+        let record: Value = serde_json::from_str(r#"{"timestamp": 1705314600}"#).unwrap();
+        let ts = extract_timestamp(&record).unwrap();
+        assert_eq!(ts, Utc.with_ymd_and_hms(2024, 1, 15, 10, 30, 0).unwrap());
+    }
+
+    #[test]
+    fn test_extract_timestamp_snapshot_field() {
+        // Timestamp nested inside "snapshot" object
+        let record: Value =
+            serde_json::from_str(r#"{"snapshot": {"createdAt": "2025-03-20T12:00:00Z"}}"#).unwrap();
+        let ts = extract_timestamp(&record).unwrap();
+        assert_eq!(ts, Utc.with_ymd_and_hms(2025, 3, 20, 12, 0, 0).unwrap());
+    }
+
+    #[test]
+    fn test_extract_timestamp_prefers_top_level_over_message() {
+        // When both top-level and message.createdAt exist, top-level wins
+        let record: Value = serde_json::from_str(
+            r#"{
+                "timestamp": "2025-01-15T10:30:00Z",
+                "message": {"createdAt": "2025-06-01T00:00:00Z"}
+            }"#,
+        )
+        .unwrap();
+        let ts = extract_timestamp(&record).unwrap();
+        assert_eq!(ts, Utc.with_ymd_and_hms(2025, 1, 15, 10, 30, 0).unwrap());
+    }
+
+    // ─── deduplicate_streaming – additional cases ────────────────────────────
+
+    #[test]
+    fn test_deduplicate_keeps_higher_output() {
+        // Two records with same messageId:requestId but different output_tokens → keep higher
+        let records: Vec<Value> = vec![
+            serde_json::from_str(
+                r#"{"message": {"id": "msgX", "usage": {"output_tokens": 50}}, "requestId": "reqX"}"#,
+            )
+            .unwrap(),
+            serde_json::from_str(
+                r#"{"message": {"id": "msgX", "usage": {"output_tokens": 300}}, "requestId": "reqX"}"#,
+            )
+            .unwrap(),
+        ];
+
+        let (deduped, stats) = deduplicate_streaming(&records);
+        assert_eq!(stats.before, 2);
+        assert_eq!(stats.after, 1);
+        assert_eq!(get_output_tokens(&deduped[0]), 300);
+    }
+
+    #[test]
+    fn test_deduplicate_empty_input() {
+        let records: Vec<Value> = vec![];
+        let (deduped, stats) = deduplicate_streaming(&records);
+        assert!(deduped.is_empty());
+        assert_eq!(stats.before, 0);
+        assert_eq!(stats.after, 0);
+    }
+
+    #[test]
+    fn test_deduplicate_no_keyed_records_pass_through() {
+        // Records without message.id or requestId are not subject to dedup
+        let records: Vec<Value> = vec![
+            serde_json::from_str(r#"{"foo": "bar"}"#).unwrap(),
+            serde_json::from_str(r#"{"baz": 42}"#).unwrap(),
+        ];
+        let (deduped, stats) = deduplicate_streaming(&records);
+        assert_eq!(stats.before, 2);
+        assert_eq!(stats.after, 2);
+        assert_eq!(deduped.len(), 2);
+    }
+
+    // ─── extract_project_name – additional cases ─────────────────────────────
+
+    #[test]
+    fn test_extract_project_name_deeply_nested() {
+        // Path with many components after "projects"
+        let path =
+            "/home/user/.claude/projects/-home-user-deep-path-to-workspace/session/sub/abc.jsonl";
+        assert_eq!(
+            extract_project_name(path),
+            "/home/user/deep/path/to/workspace"
+        );
+    }
+
+    #[test]
+    fn test_extract_project_name_single_component() {
+        // project part does not start with '-', returned as-is
+        let path = "/projects/test";
+        assert_eq!(extract_project_name(path), "test");
+    }
+
+    #[test]
+    fn test_extract_project_name_projects_at_root() {
+        // "projects" is the first segment; next part starts with '-'
+        let path = "projects/-home-alice-code";
+        assert_eq!(extract_project_name(path), "/home/alice/code");
+    }
+
+    // ─── format_date_in_tz – local timezone fallback ─────────────────────────
+
+    #[test]
+    fn test_format_date_local_returns_string() {
+        // With tz=None, output should be a non-empty datetime string (content varies by machine TZ)
+        let dt = Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap();
+        let result = format_date_in_tz(&dt, None);
+        // Should look like "YYYY-MM-DDTHH:MM:SS" (19 chars)
+        assert_eq!(result.len(), 19, "unexpected length: {result}");
+        assert!(result.contains('-') && result.contains('T') && result.contains(':'));
+    }
+
+    #[test]
+    fn test_format_date_local_string_explicit() {
+        // With tz=Some("local"), should behave the same as None
+        let dt = Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap();
+        let result_none = format_date_in_tz(&dt, None);
+        let result_local = format_date_in_tz(&dt, Some("local"));
+        assert_eq!(result_none, result_local);
+    }
+
+    #[test]
+    fn test_format_date_invalid_tz_falls_back_to_local() {
+        // An unrecognised timezone string falls back to local
+        let dt = Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap();
+        let result_local = format_date_in_tz(&dt, None);
+        let result_invalid = format_date_in_tz(&dt, Some("Not/AReal/Timezone"));
+        assert_eq!(result_local, result_invalid);
     }
 }

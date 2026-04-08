@@ -797,3 +797,503 @@ pub fn aggregate_by_day(sessions: &[SlSessionSummary], tz: Option<&str>) -> Vec<
 
     by_day.into_values().collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    // ─── SlRecord test helper ─────────────────────────────────────────────────
+
+    fn make_record(
+        ts_secs: i64,
+        session_id: &str,
+        project: &str,
+        cost_usd: f64,
+        duration_ms: u64,
+        five_hour_pct: Option<u8>,
+        five_hour_resets_at: Option<i64>,
+        seven_day_pct: Option<u8>,
+        seven_day_resets_at: Option<i64>,
+    ) -> SlRecord {
+        SlRecord {
+            ts: Utc.timestamp_opt(ts_secs, 0).unwrap(),
+            session_id: session_id.to_string(),
+            project: project.to_string(),
+            model_id: "claude-3-5-sonnet".to_string(),
+            model_name: "Claude 3.5 Sonnet".to_string(),
+            version: "1.0".to_string(),
+            cost_usd,
+            duration_ms,
+            api_duration_ms: 0,
+            lines_added: 0,
+            lines_removed: 0,
+            context_pct: None,
+            context_size: 0,
+            five_hour_pct,
+            five_hour_resets_at: five_hour_resets_at.map(|s| Utc.timestamp_opt(s, 0).unwrap()),
+            seven_day_pct,
+            seven_day_resets_at: seven_day_resets_at.map(|s| Utc.timestamp_opt(s, 0).unwrap()),
+        }
+    }
+
+    fn make_session_summary(
+        session_id: &str,
+        project: &str,
+        first_ts_secs: i64,
+        total_cost: f64,
+        min_five_hour_pct: Option<u8>,
+        max_five_hour_pct: Option<u8>,
+        min_seven_day_pct: Option<u8>,
+        max_seven_day_pct: Option<u8>,
+    ) -> SlSessionSummary {
+        let first_ts = Utc.timestamp_opt(first_ts_secs, 0).unwrap();
+        SlSessionSummary {
+            session_id: session_id.to_string(),
+            project: project.to_string(),
+            model_name: "Claude 3.5 Sonnet".to_string(),
+            version: "1.0".to_string(),
+            segments: 1,
+            total_cost,
+            total_duration_ms: 1000,
+            total_api_duration_ms: 500,
+            total_lines_added: 10,
+            total_lines_removed: 5,
+            max_context_pct: None,
+            first_ts,
+            last_ts: first_ts,
+            min_five_hour_pct,
+            max_five_hour_pct,
+            min_seven_day_pct,
+            max_seven_day_pct,
+        }
+    }
+
+    // ─── promo_overlap_ratio ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_promo_overlap_ratio_no_overlap() {
+        // Range completely before first promo interval (1766620800, 1767225600)
+        let ratio = promo_overlap_ratio(1000000000, 1000001000);
+        assert_eq!(ratio, 0.0);
+    }
+
+    #[test]
+    fn test_promo_overlap_ratio_full_overlap() {
+        // Range that exactly matches the first promo interval
+        let ps = 1766620800_i64;
+        let pe = 1767225600_i64;
+        let ratio = promo_overlap_ratio(ps, pe);
+        assert!((ratio - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_promo_overlap_ratio_partial() {
+        // Range that covers exactly half of the first promo interval
+        let ps = 1766620800_i64;
+        let pe = 1767225600_i64;
+        let mid = (ps + pe) / 2;
+        // Window [ps, mid) is exactly 50% of [ps, pe)
+        let ratio = promo_overlap_ratio(ps, mid);
+        assert!(
+            (ratio - 1.0).abs() < 1e-9,
+            "ratio should be 1.0 (window is entirely within promo): {ratio}"
+        );
+
+        // Window [mid, pe) – another 50% chunk, also fully within promo
+        let ratio2 = promo_overlap_ratio(mid, pe);
+        assert!((ratio2 - 1.0).abs() < 1e-9, "ratio2: {ratio2}");
+
+        // Window twice as large: [ps, pe + (pe-ps)] — promo covers only half
+        let double_end = pe + (pe - ps);
+        let ratio3 = promo_overlap_ratio(ps, double_end);
+        assert!(
+            (ratio3 - 0.5).abs() < 1e-6,
+            "ratio3 should be ~0.5: {ratio3}"
+        );
+    }
+
+    #[test]
+    fn test_promo_overlap_ratio_zero_window() {
+        // start == end → window_dur == 0 → should return 0.0 (no division)
+        let ts = 1766620800_i64;
+        let ratio = promo_overlap_ratio(ts, ts);
+        assert_eq!(ratio, 0.0);
+    }
+
+    // ─── compute_est_budget ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_compute_est_budget_no_promo() {
+        // promo=false, delta_pct=50, cost=10.0 → 10.0 * 100 / 50 = 20.0
+        let result = compute_est_budget(10.0, 50, false, 0, 1000);
+        assert_eq!(result, Some(20.0));
+    }
+
+    #[test]
+    fn test_compute_est_budget_with_promo() {
+        // promo=true, window fully within first promo interval → ratio=1.0 → adjustment=2.0
+        // delta_pct=50, cost=10.0 → 10.0 * 100 / (50 * 2.0) = 10.0
+        let ps = 1766620800_i64;
+        let pe = 1767225600_i64;
+        let result = compute_est_budget(10.0, 50, true, ps, pe);
+        // ratio=1.0, adjusted_delta = 50 * 2.0 = 100.0, est = 10.0 * 100 / 100 = 10.0
+        assert!(result.is_some());
+        let val = result.unwrap();
+        assert!((val - 10.0).abs() < 1e-9, "expected ~10.0, got {val}");
+    }
+
+    #[test]
+    fn test_compute_est_budget_zero_delta() {
+        // delta_pct=0 → None
+        let result = compute_est_budget(10.0, 0, false, 0, 1000);
+        assert!(result.is_none());
+    }
+
+    // ─── is_reset ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_is_reset_cost_drop() {
+        // cost drops significantly → true
+        assert!(is_reset(5.0, 1000, 0.5, 1000));
+    }
+
+    #[test]
+    fn test_is_reset_duration_drop() {
+        // duration drops by more than 100 ms → true
+        assert!(is_reset(5.0, 5000, 5.0, 100));
+    }
+
+    #[test]
+    fn test_is_reset_prev_zero() {
+        // prev values near zero → not a reset (new session just started)
+        assert!(!is_reset(0.0, 0, 0.0, 0));
+        assert!(!is_reset(0.00005, 50, 0.0, 0));
+    }
+
+    #[test]
+    fn test_is_reset_increasing() {
+        // all values increasing → not a reset
+        assert!(!is_reset(1.0, 1000, 2.0, 2000));
+    }
+
+    // ─── aggregate_ratelimit – EOF flush ────────────────────────────────────
+
+    #[test]
+    fn test_aggregate_ratelimit_eof_flush_remaining() {
+        // Session A: two records with the same (5h%, 7d%) pair.
+        // The first is emitted; the second is skipped (same pair).
+        // At EOF, the cost delta from the skipped second record should be flushed
+        // onto the first (and only emitted) entry.
+        let resets_5h = 1700000000_i64 + 5 * 3600;
+        let resets_7d = 1700000000_i64 + 7 * 86400;
+
+        let rec1 = make_record(
+            1700000000,
+            "sessA",
+            "/proj",
+            1.0, // baseline cost
+            1000,
+            Some(10),
+            Some(resets_5h),
+            Some(5),
+            Some(resets_7d),
+        );
+        let rec2 = make_record(
+            1700001000,
+            "sessA",
+            "/proj",
+            2.5, // cost grew by 1.5 since rec1
+            2000,
+            Some(10), // same pct pair — will be skipped
+            Some(resets_5h),
+            Some(5),
+            Some(resets_7d),
+        );
+
+        let records = vec![rec1, rec2];
+        let entries = aggregate_ratelimit(&records);
+
+        // Only one entry should be emitted (second was deduped by same-pair rule)
+        assert_eq!(entries.len(), 1);
+
+        // The emitted entry's cost_delta should include the skipped record's cost
+        // Baseline for sessA is initialised to rec1.cost_usd = 1.0 (first record).
+        // rec1 emitted: delta = 1.0 - 1.0 = 0.0 (first record sets baseline)
+        // rec2 skipped: cost grew to 2.5
+        // EOF flush: remaining = 2.5 - 1.0 = 1.5 added to entry
+        assert!(
+            entries[0].cost_delta > 0.0,
+            "cost_delta should be > 0 after EOF flush, got {}",
+            entries[0].cost_delta
+        );
+    }
+
+    #[test]
+    fn test_aggregate_ratelimit_eof_flush_synthetic_entry() {
+        // All records in a session have the same pct pair → nothing is emitted normally.
+        // EOF flush should create a synthetic entry rather than losing the cost.
+        let resets_5h = 1700000000_i64 + 5 * 3600;
+        let resets_7d = 1700000000_i64 + 7 * 86400;
+
+        // Make a *different* session emit something first to populate last_pair,
+        // then sessB whose entries all share pct=(10,5) — they will all be skipped
+        // because last_pair (from sessA below) starts as None, so sessB's first
+        // record IS emitted. Let's make a simpler scenario instead:
+        // Two sessions: sessA emits first (pair 10,5), sessB also has pair (10,5)
+        // so sessB's records are ALL skipped → synthetic entry must be created.
+
+        let rec_a = make_record(
+            1700000000,
+            "sessA",
+            "/proj",
+            0.5,
+            500,
+            Some(10),
+            Some(resets_5h),
+            Some(5),
+            Some(resets_7d),
+        );
+        // sessB records with same pct pair — will be deduped since last_pair already (10,5)
+        let rec_b1 = make_record(
+            1700000100,
+            "sessB",
+            "/proj",
+            1.0,
+            1000,
+            Some(10),
+            Some(resets_5h),
+            Some(5),
+            Some(resets_7d),
+        );
+        let rec_b2 = make_record(
+            1700000200,
+            "sessB",
+            "/proj",
+            3.0,
+            1500,
+            Some(10),
+            Some(resets_5h),
+            Some(5),
+            Some(resets_7d),
+        );
+
+        let records = vec![rec_a, rec_b1, rec_b2];
+        let entries = aggregate_ratelimit(&records);
+
+        // sessA emitted 1 entry; sessB had all entries skipped → synthetic entry added
+        assert!(
+            entries.len() >= 2,
+            "expected at least 2 entries (sessA + synthetic for sessB), got {}",
+            entries.len()
+        );
+
+        let sessb_entry = entries.iter().find(|e| e.session_id == "sessB");
+        assert!(
+            sessb_entry.is_some(),
+            "expected a synthetic entry for sessB"
+        );
+        let sessb_entry = sessb_entry.unwrap();
+        // sessB cost went from baseline 1.0 (first record) to 3.0 → delta = 2.0
+        assert!(
+            sessb_entry.cost_delta > 0.0,
+            "sessB synthetic entry cost_delta should be > 0, got {}",
+            sessb_entry.cost_delta
+        );
+    }
+
+    // ─── aggregate_by_project – pct merging ─────────────────────────────────
+
+    #[test]
+    fn test_aggregate_by_project_pct_merging() {
+        // Two sessions in the same project with different pct ranges
+        let s1 = make_session_summary(
+            "sess1",
+            "/myproject",
+            1700000000,
+            1.0,
+            Some(10),
+            Some(30),
+            Some(2),
+            Some(8),
+        );
+        let s2 = make_session_summary(
+            "sess2",
+            "/myproject",
+            1700001000,
+            2.0,
+            Some(5),
+            Some(40),
+            Some(1),
+            Some(12),
+        );
+
+        let projects = aggregate_by_project(&[s1, s2]);
+        assert_eq!(projects.len(), 1);
+
+        let p = &projects[0];
+        assert_eq!(p.project, "/myproject");
+        assert!((p.total_cost - 3.0).abs() < 1e-9);
+        assert_eq!(p.session_count, 2);
+        // min_five_hour_pct should be the minimum of (10, 5) = 5
+        assert_eq!(p.min_five_hour_pct, Some(5));
+        // max_five_hour_pct should be the maximum of (30, 40) = 40
+        assert_eq!(p.max_five_hour_pct, Some(40));
+        // min_seven_day_pct: min(2, 1) = 1
+        assert_eq!(p.min_seven_day_pct, Some(1));
+        // max_seven_day_pct: max(8, 12) = 12
+        assert_eq!(p.max_seven_day_pct, Some(12));
+    }
+
+    #[test]
+    fn test_aggregate_by_project_multiple_projects() {
+        let s1 = make_session_summary("sess1", "projA", 1700000000, 1.5, None, None, None, None);
+        let s2 = make_session_summary("sess2", "projB", 1700001000, 2.5, None, None, None, None);
+        let s3 = make_session_summary("sess3", "projA", 1700002000, 0.5, None, None, None, None);
+
+        let mut projects = aggregate_by_project(&[s1, s2, s3]);
+        projects.sort_by(|a, b| a.project.cmp(&b.project));
+
+        assert_eq!(projects.len(), 2);
+        let pa = projects.iter().find(|p| p.project == "projA").unwrap();
+        let pb = projects.iter().find(|p| p.project == "projB").unwrap();
+
+        assert!((pa.total_cost - 2.0).abs() < 1e-9);
+        assert_eq!(pa.session_count, 2);
+        assert!((pb.total_cost - 2.5).abs() < 1e-9);
+        assert_eq!(pb.session_count, 1);
+    }
+
+    // ─── aggregate_by_day ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_aggregate_by_day_utc() {
+        // Sessions on 2025-01-15 and 2025-01-16 UTC
+        let s1 = make_session_summary(
+            "sess1", "/proj", // 2025-01-15T10:00:00Z
+            1736935200, 1.0, None, None, None, None,
+        );
+        let s2 = make_session_summary(
+            "sess2", "/proj", // 2025-01-16T10:00:00Z
+            1737021600, 2.0, None, None, None, None,
+        );
+        let s3 = make_session_summary(
+            "sess3", "/proj", // 2025-01-15T23:00:00Z – same day as s1
+            1736982000, 0.5, None, None, None, None,
+        );
+
+        let mut days = aggregate_by_day(&[s1, s2, s3], Some("UTC"));
+        days.sort_by(|a, b| a.date.cmp(&b.date));
+
+        assert_eq!(days.len(), 2);
+        assert_eq!(days[0].date, "2025-01-15");
+        assert!((days[0].total_cost - 1.5).abs() < 1e-9);
+        assert_eq!(days[0].session_count, 2);
+        assert_eq!(days[1].date, "2025-01-16");
+        assert!((days[1].total_cost - 2.0).abs() < 1e-9);
+        assert_eq!(days[1].session_count, 1);
+    }
+
+    // ─── format_date_in_tz / format_datetime_in_tz ──────────────────────────
+
+    #[test]
+    fn test_format_date_in_tz_utc() {
+        let dt = Utc.with_ymd_and_hms(2025, 6, 15, 23, 0, 0).unwrap();
+        let tz = resolve_tz(Some("UTC"));
+        assert_eq!(format_date_in_tz(&dt, &tz), "2025-06-15");
+    }
+
+    #[test]
+    fn test_format_date_in_tz_fixed_offset() {
+        // 2025-06-15T23:00:00Z + 02:00 → 2025-06-16T01:00:00 → date "2025-06-16"
+        let dt = Utc.with_ymd_and_hms(2025, 6, 15, 23, 0, 0).unwrap();
+        let tz = resolve_tz(Some("+02:00"));
+        assert_eq!(format_date_in_tz(&dt, &tz), "2025-06-16");
+    }
+
+    #[test]
+    fn test_format_date_in_tz_iana() {
+        // 2025-06-15T23:00:00Z in Asia/Shanghai (+08:00) → 2025-06-16T07:00:00 → "2025-06-16"
+        let dt = Utc.with_ymd_and_hms(2025, 6, 15, 23, 0, 0).unwrap();
+        let tz = resolve_tz(Some("Asia/Shanghai"));
+        assert_eq!(format_date_in_tz(&dt, &tz), "2025-06-16");
+    }
+
+    #[test]
+    fn test_format_datetime_in_tz_utc() {
+        let dt = Utc.with_ymd_and_hms(2025, 3, 10, 8, 30, 45).unwrap();
+        let tz = resolve_tz(Some("UTC"));
+        assert_eq!(format_datetime_in_tz(&dt, &tz), "2025-03-10T08:30:45");
+    }
+
+    #[test]
+    fn test_format_datetime_in_tz_fixed_offset() {
+        let dt = Utc.with_ymd_and_hms(2025, 3, 10, 8, 0, 0).unwrap();
+        let tz = resolve_tz(Some("+05:30"));
+        assert_eq!(format_datetime_in_tz(&dt, &tz), "2025-03-10T13:30:00");
+    }
+
+    #[test]
+    fn test_format_datetime_in_tz_iana() {
+        let dt = Utc.with_ymd_and_hms(2025, 1, 10, 8, 0, 0).unwrap();
+        let tz = resolve_tz(Some("US/Eastern"));
+        // January: EST is UTC-5
+        assert_eq!(format_datetime_in_tz(&dt, &tz), "2025-01-10T03:00:00");
+    }
+
+    // ─── aggregate_windows – 1h splitting ───────────────────────────────────
+
+    #[test]
+    fn test_aggregate_windows_1h_splitting() {
+        // All records share a single five_hour_resets_at window.
+        // Records are spread across two different hours within that window.
+        // aggregate_windows(WindowType::OneHour) should split them into hour-chunks.
+        let resets_ts = 1700018000_i64; // some future time = window_end
+        let window_end = Utc.timestamp_opt(resets_ts, 0).unwrap();
+        let window_start = window_end - Duration::hours(5);
+
+        // hour 0: records in [window_start, window_start+1h)
+        let h0_ts = window_start.timestamp() + 100;
+        // hour 1: records in [window_start+1h, window_start+2h)
+        let h1_ts = window_start.timestamp() + 3700;
+
+        let rec1 = make_record(
+            h0_ts,
+            "sessA",
+            "/proj",
+            1.0,
+            1000,
+            Some(10),
+            Some(resets_ts),
+            Some(3),
+            Some(resets_ts + 7 * 86400),
+        );
+        let rec2 = make_record(
+            h1_ts,
+            "sessA",
+            "/proj",
+            2.0,
+            2000,
+            Some(20),
+            Some(resets_ts),
+            Some(4),
+            Some(resets_ts + 7 * 86400),
+        );
+
+        let records = vec![rec1, rec2];
+        let sessions = aggregate_sessions(&records);
+        let windows = aggregate_windows(&records, &sessions, WindowType::OneHour, false);
+
+        // Should produce 2 window summaries (one per occupied hour-chunk)
+        assert_eq!(
+            windows.len(),
+            2,
+            "expected 2 hour-chunks, got {}",
+            windows.len()
+        );
+        // All summaries should have five_hour_resets_at set
+        for w in &windows {
+            assert!(w.five_hour_resets_at.is_some());
+        }
+    }
+}
