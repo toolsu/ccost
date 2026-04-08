@@ -100,7 +100,7 @@ pub fn format_html(data: &[GroupedData], totals: &GroupedData, options: &HtmlOpt
 
     // h1
     if is_default_title {
-        html.push_str("<h1><a href=\"https://github.com/toolsu/ccost\">");
+        html.push_str("<h1><a href=\"https://github.com/cc-friend/ccost\">");
         html.push_str(&html_escape(title));
         html.push_str("</a></h1>\n");
     } else {
@@ -441,7 +441,7 @@ mod tests {
         let result = format_html(&data, &totals, &options);
         assert!(result.contains("<!DOCTYPE html>"));
         assert!(result.contains("ccost report"));
-        assert!(result.contains("https://github.com/toolsu/ccost"));
+        assert!(result.contains("https://github.com/cc-friend/ccost"));
         assert!(result.contains("<thead>"));
         assert!(result.contains("<tbody>"));
         assert!(result.contains("<tfoot>"));
@@ -477,7 +477,7 @@ mod tests {
         let result = format_html(&data, &totals, &options);
         assert!(result.contains("My Custom Report"));
         // Custom title should NOT have the link
-        assert!(!result.contains("https://github.com/toolsu/ccost"));
+        assert!(!result.contains("https://github.com/cc-friend/ccost"));
     }
 
     #[test]

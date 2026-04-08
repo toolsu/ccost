@@ -1098,7 +1098,7 @@ pub fn render_html(
     html.push_str("</title>\n<style>\n");
     html.push_str(SL_CSS);
     html.push_str("\n</style>\n</head>\n<body>\n");
-    html.push_str("<h1><a href=\"https://github.com/toolsu/ccost\">");
+    html.push_str("<h1><a href=\"https://github.com/cc-friend/ccost\">");
     html.push_str(title);
     html.push_str("</a></h1>\n");
 

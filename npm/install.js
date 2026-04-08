@@ -13,7 +13,7 @@ if (process.env.CCOST_SKIP_INSTALL) {
 }
 
 const VERSION = require("./package.json").version;
-const REPO = "toolsu/ccost";
+const REPO = "cc-friend/ccost";
 
 function getPlatformName() {
   const platform = process.platform;
