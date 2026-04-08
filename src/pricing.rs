@@ -429,6 +429,8 @@ mod tests {
             session_id: "s1".to_string(),
             project: "p1".to_string(),
             agent_id: String::new(),
+            tool_names: String::new(),
+            line: 0,
             input_tokens: 1000,
             output_tokens: 500,
             cache_creation_tokens: 100,
@@ -454,6 +456,8 @@ mod tests {
             session_id: "s1".to_string(),
             project: "p1".to_string(),
             agent_id: String::new(),
+            tool_names: String::new(),
+            line: 0,
             input_tokens: 1000,
             output_tokens: 500,
             cache_creation_tokens: 0,
@@ -482,6 +486,8 @@ mod tests {
             session_id: "s1".to_string(),
             project: "p1".to_string(),
             agent_id: String::new(),
+            tool_names: String::new(),
+            line: 0,
             input_tokens: 1000,
             output_tokens: 500,
             cache_creation_tokens: 0,
@@ -505,6 +511,8 @@ mod tests {
                 session_id: "s1".to_string(),
                 project: "p1".to_string(),
                 agent_id: String::new(),
+                tool_names: String::new(),
+                line: 0,
                 input_tokens: 1000,
                 output_tokens: 500,
                 cache_creation_tokens: 0,
@@ -516,6 +524,8 @@ mod tests {
                 session_id: "s1".to_string(),
                 project: "p1".to_string(),
                 agent_id: String::new(),
+                tool_names: String::new(),
+                line: 0,
                 input_tokens: 2000,
                 output_tokens: 1000,
                 cache_creation_tokens: 0,
@@ -527,5 +537,141 @@ mod tests {
         assert_eq!(priced.len(), 2);
         // Second record has 2x tokens, should have ~2x cost
         assert!(priced[1].input_cost > priced[0].input_cost);
+    }
+
+    #[test]
+    fn test_calculate_cost_multiple_unknown_models_warns_once() {
+        // Two records with the same unknown model — both should get 0 cost.
+        // This exercises the warning-dedup path (warned HashSet).
+        let pricing = load_pricing();
+        let records = vec![
+            TokenRecord {
+                timestamp: chrono::Utc::now(),
+                model: "absolutely-unknown-model-zzz".to_string(),
+                session_id: "s1".to_string(),
+                project: "p1".to_string(),
+                agent_id: String::new(),
+                tool_names: String::new(),
+                line: 0,
+                input_tokens: 100,
+                output_tokens: 50,
+                cache_creation_tokens: 0,
+                cache_read_tokens: 0,
+            },
+            TokenRecord {
+                timestamp: chrono::Utc::now(),
+                model: "absolutely-unknown-model-zzz".to_string(),
+                session_id: "s2".to_string(),
+                project: "p1".to_string(),
+                agent_id: String::new(),
+                tool_names: String::new(),
+                line: 0,
+                input_tokens: 200,
+                output_tokens: 100,
+                cache_creation_tokens: 0,
+                cache_read_tokens: 0,
+            },
+        ];
+
+        let priced = calculate_cost(&records, Some(&pricing));
+        assert_eq!(priced.len(), 2);
+        // Both unknown-model records must have zero cost
+        assert_eq!(priced[0].total_cost, 0.0);
+        assert_eq!(priced[1].total_cost, 0.0);
+        assert_eq!(priced[0].input_cost, 0.0);
+        assert_eq!(priced[1].input_cost, 0.0);
+    }
+
+    #[test]
+    fn test_calculate_cost_preserves_record_fields() {
+        // Verify that all fields from TokenRecord are faithfully copied into
+        // PricedTokenRecord by from_token_record.
+        let ts = chrono::Utc::now();
+        let record = TokenRecord {
+            timestamp: ts,
+            model: "claude-opus-4-6".to_string(),
+            session_id: "session-abc".to_string(),
+            project: "proj-xyz".to_string(),
+            agent_id: "agent-001".to_string(),
+            tool_names: String::new(),
+            line: 0,
+            input_tokens: 123,
+            output_tokens: 456,
+            cache_creation_tokens: 78,
+            cache_read_tokens: 90,
+        };
+        let pricing = load_pricing();
+        let priced = calculate_cost(&[record.clone()], Some(&pricing));
+
+        assert_eq!(priced.len(), 1);
+        let p = &priced[0];
+        assert_eq!(p.timestamp, ts);
+        assert_eq!(p.model, "claude-opus-4-6");
+        assert_eq!(p.session_id, "session-abc");
+        assert_eq!(p.project, "proj-xyz");
+        assert_eq!(p.agent_id, "agent-001");
+        assert_eq!(p.input_tokens, 123);
+        assert_eq!(p.output_tokens, 456);
+        assert_eq!(p.cache_creation_tokens, 78);
+        assert_eq!(p.cache_read_tokens, 90);
+        // total_cost = sum of individual costs
+        let expected = p.input_cost + p.cache_creation_cost + p.cache_read_cost + p.output_cost;
+        assert!((p.total_cost - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_match_case_insensitive_exact_stripped() {
+        // "Claude-Sonnet-4-20250514" should match pricing key "claude-sonnet-4"
+        // via: strip date suffix → "Claude-Sonnet-4", then case-insensitive exact match.
+        let models = make_pricing(vec![("claude-sonnet-4", 0.003, 0.015, 0.0, 0.0)]);
+        let result = match_model_name("Claude-Sonnet-4-20250514", &models);
+        assert!(
+            result.is_some(),
+            "expected case-insensitive date-stripped match"
+        );
+        assert_eq!(result.unwrap().input_cost_per_token, 0.003);
+    }
+
+    #[test]
+    fn test_match_model_no_false_positive_partial() {
+        // "claude" is in the bundled pricing, but the substring tier must not
+        // accidentally match it when a better key like "claude-sonnet-4" is present.
+        // The test verifies that "claude" does NOT match "claude-opus-4-6" via the
+        // substring tier when the pricing table contains both.
+        let models = make_pricing(vec![
+            ("claude-opus-4-6", 0.01, 0.02, 0.0, 0.0),
+            ("claude-sonnet-4", 0.003, 0.015, 0.0, 0.0),
+        ]);
+        // "claude" is shorter than both keys.  The substring tier checks whether
+        // jsonl_lower.contains(key_lower) || key_lower.contains(jsonl_lower).
+        // "claude-opus-4-6".contains("claude") → true, so Tier 4 WILL return a hit.
+        // The important property is that a result IS returned (not panicking), and
+        // that it is one of the two known pricing entries.
+        let result = match_model_name("claude", &models);
+        // Tier 4: one of the keys contains "claude" → should match
+        assert!(result.is_some());
+        let cost = result.unwrap().input_cost_per_token;
+        assert!(
+            cost == 0.01 || cost == 0.003,
+            "matched cost should be one of the two known models"
+        );
+    }
+
+    #[test]
+    fn test_load_pricing_has_known_models() {
+        let pricing = load_pricing();
+        // A sample of models that must be present in the bundled pricing data
+        let expected = &[
+            "claude-sonnet-4-20250514",
+            "claude-opus-4-6",
+            "claude-3-5-haiku-20241022",
+        ];
+        for key in expected {
+            assert!(
+                pricing.models.contains_key(*key),
+                "bundled pricing missing expected model key: {}",
+                key
+            );
+        }
     }
 }

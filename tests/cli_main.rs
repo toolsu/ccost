@@ -1444,3 +1444,545 @@ fn test_copy_with_chart() {
     );
     clear_clipboard();
 }
+
+// ─── 33. --per subagent ────────────────────────────────────────────────────────
+
+#[test]
+fn test_per_subagent() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--per",
+            "subagent",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "--per subagent should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    // Main session records are labeled "(main)"
+    assert!(
+        stdout.contains("(main)"),
+        "--per subagent should label main session records as '(main)'"
+    );
+    assert!(stdout.contains("TOTAL"), "should contain TOTAL row");
+}
+
+// ─── 34. --per session --per model (two-level grouping) ───────────────────────
+
+#[test]
+fn test_per_two_dimensions() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--per",
+            "session",
+            "--per",
+            "model",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "two-level grouping should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("TOTAL"), "should contain TOTAL row");
+    // Two-level grouping produces child rows indented with a tree prefix
+    assert!(
+        stdout.contains("└─ ") || stdout.contains("├─ "),
+        "two-level grouping should have child rows with tree prefix"
+    );
+}
+
+// ─── 35. --from and --to flags with valid data ────────────────────────────────
+
+#[test]
+fn test_from_and_to_flags() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--from",
+            "2020-01-01",
+            "--to",
+            "2030-01-01",
+            "--per",
+            "day",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "--from/--to should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    // Both records are within the range
+    assert!(stdout.contains("2026-03-22"), "should include 2026-03-22");
+    assert!(stdout.contains("2026-03-23"), "should include 2026-03-23");
+    assert!(stdout.contains("TOTAL"), "should have TOTAL row");
+}
+
+// ─── 36. --tz UTC flag ────────────────────────────────────────────────────────
+
+#[test]
+fn test_timezone_utc() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--tz",
+            "UTC",
+            "--per",
+            "day",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "--tz UTC should succeed");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("Streaming dedup"), "should show dedup info");
+}
+
+// ─── 37. --tz IANA name ───────────────────────────────────────────────────────
+
+#[test]
+fn test_timezone_iana() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--tz",
+            "America/New_York",
+            "--per",
+            "day",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "--tz America/New_York should succeed"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("TOTAL"), "should have TOTAL row");
+}
+
+// ─── 38. --tz fixed offset ────────────────────────────────────────────────────
+
+#[test]
+fn test_timezone_fixed_offset() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--tz",
+            "+08:00",
+            "--per",
+            "day",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "--tz +08:00 should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("TOTAL"), "should have TOTAL row");
+}
+
+// ─── 39. --model filter ───────────────────────────────────────────────────────
+
+#[test]
+fn test_model_filter() {
+    let dir = make_fixture(&[
+        mock_rec(
+            "claude-sonnet-4-20250514",
+            1000,
+            500,
+            0,
+            0,
+            "2026-03-22T10:00:00Z",
+            "req-1",
+            "msg-1",
+        ),
+        mock_rec(
+            "claude-opus-4-20250514",
+            2000,
+            800,
+            0,
+            0,
+            "2026-03-23T14:00:00Z",
+            "req-2",
+            "msg-2",
+        ),
+    ]);
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--model",
+            "sonnet",
+            "--per",
+            "model",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "--model filter should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("sonnet"),
+        "filtered output should contain sonnet model"
+    );
+    assert!(
+        !stdout.contains("opus"),
+        "filtered output should not contain opus model"
+    );
+}
+
+// ─── 40. --session filter ─────────────────────────────────────────────────────
+
+#[test]
+fn test_session_filter() {
+    // Create two sessions in different files
+    let dir = TempDir::new().unwrap();
+    let proj_dir = dir.path().join("projects").join("test-project");
+    fs::create_dir_all(&proj_dir).unwrap();
+
+    let rec_a = serde_json::json!({
+        "timestamp": "2026-03-22T10:00:00Z",
+        "type": "assistant",
+        "sessionId": "session-alpha-111",
+        "message": {
+            "id": "msg-a",
+            "role": "assistant",
+            "model": "claude-sonnet-4-20250514",
+            "usage": {
+                "input_tokens": 1000,
+                "output_tokens": 500,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+            }
+        },
+        "requestId": "req-a",
+    });
+    let rec_b = serde_json::json!({
+        "timestamp": "2026-03-23T10:00:00Z",
+        "type": "assistant",
+        "sessionId": "session-beta-222",
+        "message": {
+            "id": "msg-b",
+            "role": "assistant",
+            "model": "claude-sonnet-4-20250514",
+            "usage": {
+                "input_tokens": 2000,
+                "output_tokens": 800,
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0
+            }
+        },
+        "requestId": "req-b",
+    });
+
+    fs::write(
+        proj_dir.join("session-alpha-111.jsonl"),
+        serde_json::to_string(&rec_a).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        proj_dir.join("session-beta-222.jsonl"),
+        serde_json::to_string(&rec_b).unwrap(),
+    )
+    .unwrap();
+
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--session",
+            "alpha",
+            "--per",
+            "session",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "--session filter should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("alpha"),
+        "filtered output should contain alpha session"
+    );
+    assert!(
+        !stdout.contains("beta"),
+        "filtered output should not contain beta session"
+    );
+}
+
+// ─── 41. JSON output includes from/to in meta ─────────────────────────────────
+
+#[test]
+fn test_output_json_with_from_to() {
+    let dir = two_record_fixture();
+    let out_dir = TempDir::new().unwrap();
+
+    Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--output",
+            "json",
+            "--from",
+            "2026-01-01",
+            "--to",
+            "2026-12-31",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .current_dir(out_dir.path())
+        .assert()
+        .success();
+
+    let json_path = out_dir.path().join("ccost.json");
+    let content = fs::read_to_string(&json_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+    assert_eq!(
+        parsed["meta"]["from"].as_str().unwrap_or(""),
+        "2026-01-01",
+        "meta.from should be set"
+    );
+    assert_eq!(
+        parsed["meta"]["to"].as_str().unwrap_or(""),
+        "2026-12-31",
+        "meta.to should be set"
+    );
+}
+
+// ─── 42. --chart cost --per day ───────────────────────────────────────────────
+
+#[test]
+fn test_chart_with_per_day() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--chart",
+            "cost",
+            "--per",
+            "day",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "--chart cost --per day should succeed"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let has_cost_label = stdout.contains("Cost");
+    let has_braille = stdout
+        .chars()
+        .any(|c| ('\u{2800}'..='\u{28FF}').contains(&c));
+    assert!(
+        has_cost_label || has_braille,
+        "chart output should contain Cost label or braille characters"
+    );
+}
+
+// ─── 43. --per hour ───────────────────────────────────────────────────────────
+
+#[test]
+fn test_per_hour() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--per",
+            "hour",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "--per hour should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    // Hour format is "YYYY-MM-DD HH:00"
+    assert!(
+        stdout.contains(":00"),
+        "--per hour should show hour labels with :00"
+    );
+    assert!(stdout.contains("TOTAL"), "should have TOTAL row");
+}
+
+// ─── 44. --per month ──────────────────────────────────────────────────────────
+
+#[test]
+fn test_per_month() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--per",
+            "month",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "--per month should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    // Both fixture records are in 2026-03
+    assert!(
+        stdout.contains("2026-03"),
+        "--per month should show 2026-03 label"
+    );
+    assert!(stdout.contains("TOTAL"), "should have TOTAL row");
+}
+
+// ─── 45. --per project ────────────────────────────────────────────────────────
+
+#[test]
+fn test_per_project() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--per",
+            "project",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "--per project should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("TOTAL"), "should have TOTAL row");
+    // The fixture project path decodes to something containing "test"
+    assert!(
+        stdout.contains("test"),
+        "--per project should show project name containing 'test'"
+    );
+}
+
+// ─── 46. --cost integer mode ──────────────────────────────────────────────────
+
+#[test]
+fn test_cost_integer_mode() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--cost",
+            "true",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "--cost true (integer) should succeed"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    // Integer mode shows "$N" without decimals
+    assert!(stdout.contains("$"), "integer cost mode should show '$'");
+}
+
+// ─── 47. --cost off mode hides costs ──────────────────────────────────────────
+
+#[test]
+fn test_cost_off_mode() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--cost",
+            "false",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "--cost false (off) should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        !stdout.contains("$"),
+        "--cost false should hide cost column (no '$')"
+    );
+    assert!(stdout.contains("TOTAL"), "should still have TOTAL row");
+}
+
+// ─── 48. --order asc explicit ─────────────────────────────────────────────────
+
+#[test]
+fn test_order_asc() {
+    let dir = two_record_fixture();
+    let output = Command::cargo_bin("ccost")
+        .unwrap()
+        .args([
+            "--order",
+            "asc",
+            "--per",
+            "day",
+            "--claude-dir",
+            dir.path().to_str().unwrap(),
+            "--tz",
+            "UTC",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success(), "--order asc should succeed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    // In ascending order, 2026-03-22 should appear before 2026-03-23
+    let pos_22 = stdout.find("2026-03-22");
+    let pos_23 = stdout.find("2026-03-23");
+    assert!(pos_22.is_some(), "Expected 2026-03-22 in output");
+    assert!(pos_23.is_some(), "Expected 2026-03-23 in output");
+    assert!(
+        pos_22.unwrap() < pos_23.unwrap(),
+        "In asc order, 2026-03-22 should appear before 2026-03-23"
+    );
+}

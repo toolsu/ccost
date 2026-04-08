@@ -1915,4 +1915,839 @@ mod tests {
             "header should contain API Time"
         );
     }
+
+    // ── Helper constructors ──────────────────────────────────────────────────
+
+    fn make_project_summary(project: &str, cost: f64, sessions: u32) -> SlProjectSummary {
+        SlProjectSummary {
+            project: project.to_string(),
+            total_cost: cost,
+            total_duration_ms: 60_000,
+            total_api_duration_ms: 30_000,
+            session_count: sessions,
+            total_lines_added: 50,
+            total_lines_removed: 20,
+            min_five_hour_pct: Some(10),
+            max_five_hour_pct: Some(40),
+            min_seven_day_pct: Some(5),
+            max_seven_day_pct: Some(20),
+        }
+    }
+
+    fn make_day_summary(date: &str, cost: f64, sessions: u32) -> SlDaySummary {
+        SlDaySummary {
+            date: date.to_string(),
+            total_cost: cost,
+            session_count: sessions,
+            min_five_hour_pct: Some(5),
+            max_five_hour_pct: Some(25),
+            min_seven_day_pct: Some(2),
+            max_seven_day_pct: Some(10),
+            total_duration_ms: 120_000,
+            total_api_duration_ms: 60_000,
+            total_lines_added: 30,
+            total_lines_removed: 10,
+        }
+    }
+
+    fn make_window_summary(
+        start_secs: i64,
+        end_secs: i64,
+        five_hour_pct: u8,
+        cost: f64,
+        est_5h: Option<f64>,
+        est_1w: Option<f64>,
+        resets_at: Option<i64>,
+    ) -> SlWindowSummary {
+        SlWindowSummary {
+            window_start: Utc.timestamp_opt(start_secs, 0).single().unwrap(),
+            window_end: Utc.timestamp_opt(end_secs, 0).single().unwrap(),
+            min_five_hour_pct: five_hour_pct,
+            max_five_hour_pct: five_hour_pct,
+            sessions: 2,
+            total_cost: cost,
+            est_5h_budget: est_5h,
+            est_1w_budget: est_1w,
+            total_duration_ms: 60_000,
+            total_api_duration_ms: 30_000,
+            total_lines_added: 10,
+            total_lines_removed: 5,
+            min_seven_day_pct: Some(30),
+            max_seven_day_pct: Some(30),
+            five_hour_resets_at: resets_at.map(|s| Utc.timestamp_opt(s, 0).single().unwrap()),
+        }
+    }
+
+    fn make_cost_diff(session_id: &str, sl_cost: f64, litellm_cost: Option<f64>) -> SlCostDiff {
+        let diff = litellm_cost.map(|l| sl_cost - l);
+        let diff_pct = litellm_cost.and_then(|l| {
+            if l > 0.0 {
+                Some((sl_cost - l) / l * 100.0)
+            } else {
+                None
+            }
+        });
+        SlCostDiff {
+            session_id: session_id.to_string(),
+            sl_cost,
+            litellm_cost,
+            diff,
+            diff_pct,
+        }
+    }
+
+    fn make_json_meta(view: &str) -> SlJsonMeta {
+        SlJsonMeta {
+            source: "test".to_string(),
+            file: "test.jsonl".to_string(),
+            view: view.to_string(),
+            from: None,
+            to: None,
+            tz: Some("UTC".to_string()),
+            generated_at: "2026-04-08T00:00:00Z".to_string(),
+        }
+    }
+
+    fn default_opts(color: bool) -> SlFormatOptions {
+        SlFormatOptions {
+            tz: Some("UTC".to_string()),
+            price_mode: PriceMode::Decimal,
+            compact: false,
+            color,
+        }
+    }
+
+    // ── display_width ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_display_width_plain_text() {
+        assert_eq!(display_width("hello"), 5);
+    }
+
+    #[test]
+    fn test_display_width_empty() {
+        assert_eq!(display_width(""), 0);
+    }
+
+    #[test]
+    fn test_display_width_with_ansi() {
+        assert_eq!(display_width("\x1b[31mhello\x1b[0m"), 5);
+    }
+
+    #[test]
+    fn test_display_width_nested_ansi() {
+        assert_eq!(display_width("\x1b[1m\x1b[31mbold red\x1b[0m"), 8);
+    }
+
+    // ── render_table / render_table_with_totals ──────────────────────────────
+
+    #[test]
+    fn test_render_table_no_headers_returns_empty() {
+        let result = render_table(&[], &[], false);
+        assert!(result.is_empty(), "no headers should return empty string");
+    }
+
+    #[test]
+    fn test_render_table_basic_box_chars() {
+        let headers = vec!["Col A".to_string(), "Col B".to_string()];
+        let rows = vec![
+            vec!["a1".to_string(), "b1".to_string()],
+            vec!["a2".to_string(), "b2".to_string()],
+        ];
+        let result = render_table(&headers, &rows, false);
+        // Top-left corner
+        assert!(result.contains('┌'), "should contain ┌");
+        // Top-right corner
+        assert!(result.contains('┐'), "should contain ┐");
+        // Bottom-left corner
+        assert!(result.contains('└'), "should contain └");
+        // Bottom-right corner
+        assert!(result.contains('┘'), "should contain ┘");
+        // Vertical bar
+        assert!(result.contains('│'), "should contain │");
+        assert!(result.contains("Col A"), "should contain header Col A");
+        assert!(result.contains("Col B"), "should contain header Col B");
+        assert!(result.contains("a1"), "should contain row data a1");
+        assert!(result.contains("b2"), "should contain row data b2");
+    }
+
+    #[test]
+    fn test_render_table_empty_rows() {
+        let headers = vec!["Header".to_string()];
+        let result = render_table(&headers, &[], false);
+        assert!(result.contains("Header"), "should still render header");
+        assert!(result.contains('└'), "should have bottom border");
+    }
+
+    #[test]
+    fn test_render_table_with_totals_color() {
+        let headers = vec!["Label".to_string(), "Value".to_string()];
+        let rows = vec![vec!["row1".to_string(), "10".to_string()]];
+        let totals = vec!["TOTAL".to_string(), "10".to_string()];
+        let result = render_table_with_totals(&headers, &rows, Some(&totals), true);
+        // Yellow ANSI should wrap the totals row content
+        assert!(
+            result.contains("\x1b[33m"),
+            "totals row should contain yellow ANSI start"
+        );
+        assert!(
+            result.contains("\x1b[0m"),
+            "totals row should contain ANSI reset"
+        );
+        assert!(result.contains("TOTAL"), "totals row should contain TOTAL");
+    }
+
+    #[test]
+    fn test_render_table_with_totals_no_color() {
+        let headers = vec!["Label".to_string(), "Value".to_string()];
+        let rows = vec![vec!["row1".to_string(), "10".to_string()]];
+        let totals = vec!["TOTAL".to_string(), "10".to_string()];
+        let result = render_table_with_totals(&headers, &rows, Some(&totals), false);
+        assert!(
+            !result.contains("\x1b[33m"),
+            "color=false should have no yellow ANSI"
+        );
+        assert!(result.contains("TOTAL"), "should still have TOTAL text");
+    }
+
+    // ── format_sl_ratelimit_table ────────────────────────────────────────────
+
+    #[test]
+    fn test_ratelimit_table_full_mode_session_column() {
+        let entries = vec![make_ratelimit_entry(
+            1_774_483_200,
+            "mysession123",
+            20,
+            1_774_500_000,
+            40,
+            1_775_000_000,
+        )];
+        let opts = SlFormatOptions {
+            tz: Some("UTC".to_string()),
+            price_mode: PriceMode::Decimal,
+            compact: false,
+            color: false,
+        };
+        let result = format_sl_ratelimit_table(&entries, &opts);
+        assert!(
+            result.contains("Session"),
+            "full mode should have Session column"
+        );
+        // session_id truncated to 8 chars: "mysessio"
+        assert!(
+            result.contains("mysessio"),
+            "should show first 8 chars of session_id"
+        );
+    }
+
+    #[test]
+    fn test_ratelimit_table_with_cost_total() {
+        let mut e =
+            make_ratelimit_entry(1_774_483_200, "sess1", 30, 1_774_500_000, 50, 1_775_000_000);
+        e.cost_delta = 0.50;
+        let entries = vec![e];
+        let opts = SlFormatOptions {
+            tz: Some("UTC".to_string()),
+            price_mode: PriceMode::Decimal,
+            compact: false,
+            color: false,
+        };
+        let result = format_sl_ratelimit_table(&entries, &opts);
+        assert!(result.contains("TOTAL"), "should have TOTAL row");
+        // cost 0.50 should appear somewhere in the output
+        assert!(
+            result.contains("0.50") || result.contains("0.500"),
+            "should show cost"
+        );
+    }
+
+    // ── format_sl_session_table ──────────────────────────────────────────────
+
+    #[test]
+    fn test_session_table_multiple_sessions_and_total() {
+        let sessions = vec![
+            make_session_summary("aaa111", "/proj/a", 0.30, 60_000, 30_000, 10, 5, None, 1),
+            make_session_summary("bbb222", "/proj/b", 0.20, 30_000, 15_000, 20, 8, None, 1),
+        ];
+        let opts = default_opts(false);
+        let result = format_sl_session_table(&sessions, &opts);
+        // Both session ids (truncated to 8 chars)
+        assert!(result.contains("aaa111"), "should contain first session");
+        assert!(result.contains("bbb222"), "should contain second session");
+        // TOTAL row
+        assert!(result.contains("TOTAL"), "should contain TOTAL row");
+    }
+
+    // ── format_sl_project_table ──────────────────────────────────────────────
+
+    #[test]
+    fn test_project_table_basic_headers_and_data() {
+        let projects = vec![make_project_summary("/work/myproject", 1.23, 3)];
+        let opts = default_opts(false);
+        let result = format_sl_project_table(&projects, &opts);
+        assert!(result.contains("Project"), "should contain Project header");
+        assert!(result.contains("Cost"), "should contain Cost header");
+        assert!(result.contains("Sess"), "should contain Sess header");
+        assert!(result.contains("myproject"), "should contain project name");
+        assert!(result.contains("TOTAL"), "should contain TOTAL row");
+    }
+
+    #[test]
+    fn test_project_table_compact() {
+        let projects = vec![make_project_summary("/work/p", 0.5, 1)];
+        let opts = SlFormatOptions {
+            tz: Some("UTC".to_string()),
+            price_mode: PriceMode::Decimal,
+            compact: true,
+            color: false,
+        };
+        let result = format_sl_project_table(&projects, &opts);
+        assert!(!result.contains("API Time"), "compact should hide API Time");
+        assert!(!result.contains("1w%"), "compact should hide 1w%");
+    }
+
+    // ── format_sl_day_table ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_day_table_basic_date_header() {
+        let days = vec![make_day_summary("2026-04-07", 0.75, 2)];
+        let opts = default_opts(false);
+        let result = format_sl_day_table(&days, &opts);
+        assert!(result.contains("Date"), "should contain Date header");
+        assert!(result.contains("2026-04-07"), "should contain date value");
+        assert!(result.contains("TOTAL"), "should contain TOTAL row");
+    }
+
+    #[test]
+    fn test_day_table_total_sess_is_dash() {
+        let days = vec![make_day_summary("2026-04-07", 0.5, 2)];
+        let opts = default_opts(false);
+        let result = format_sl_day_table(&days, &opts);
+        // The TOTAL row's Sess column should be "—" (not a number)
+        let total_line = result.lines().find(|l| l.contains("TOTAL")).unwrap();
+        assert!(
+            total_line.contains('\u{2014}'),
+            "TOTAL sess should be em-dash"
+        );
+    }
+
+    // ── format_sl_window_table ───────────────────────────────────────────────
+
+    #[test]
+    fn test_window_table_5h_budget_header() {
+        let windows = vec![make_window_summary(
+            1_774_483_200,
+            1_774_501_200,
+            45,
+            1.23,
+            Some(2.73),
+            None,
+            None,
+        )];
+        let opts = default_opts(false);
+        let result = format_sl_window_table(&windows, &opts, "5h Window", "Est 5h Budg");
+        assert!(
+            result.contains("Est 5h Budg"),
+            "should contain Est 5h Budg header"
+        );
+        assert!(result.contains("TOTAL"), "should contain TOTAL row");
+    }
+
+    #[test]
+    fn test_window_table_1w_budget_header() {
+        let windows = vec![make_window_summary(
+            1_774_483_200,
+            1_774_569_600,
+            20,
+            5.00,
+            None,
+            Some(25.0),
+            None,
+        )];
+        let opts = default_opts(false);
+        let result = format_sl_window_table(&windows, &opts, "1w Window", "Est 1w Budg");
+        assert!(
+            result.contains("Est 1w Budg"),
+            "should contain Est 1w Budg header"
+        );
+    }
+
+    #[test]
+    fn test_window_table_1h_with_resets_column() {
+        let windows = vec![make_window_summary(
+            1_774_483_200,
+            1_774_486_800,
+            60,
+            0.50,
+            Some(1.0),
+            None,
+            Some(1_774_500_000),
+        )];
+        let opts = default_opts(false);
+        let result = format_sl_window_table(&windows, &opts, "1h Window", "Est 5h Budg");
+        assert!(
+            result.contains("5h Resets"),
+            "1h window should have 5h Resets column"
+        );
+        assert!(
+            result.contains("Est 5h Budg"),
+            "1h window should have Est 5h Budg column"
+        );
+    }
+
+    // ── format_sl_cost_diff_table ────────────────────────────────────────────
+
+    #[test]
+    fn test_cost_diff_table_matched_entries() {
+        let sessions = vec![make_session_summary(
+            "abc12345678",
+            "/proj/foo",
+            1.0,
+            3_600_000,
+            1_800_000,
+            10,
+            5,
+            None,
+            1,
+        )];
+        let diffs = vec![make_cost_diff("abc12345678", 1.0, Some(0.9))];
+        let opts = default_opts(false);
+        let result = format_sl_cost_diff_table(&sessions, &diffs, &opts);
+        assert!(result.contains("Cost(SL)"), "should have Cost(SL) header");
+        assert!(
+            result.contains("Cost(LiteLLM)"),
+            "should have Cost(LiteLLM) header"
+        );
+        assert!(result.contains("Diff"), "should have Diff header");
+        assert!(result.contains("TOTAL"), "should have TOTAL row");
+        // Should not have footnote for unmatched
+        assert!(
+            !result.contains("unmatched"),
+            "no unmatched footnote when all matched"
+        );
+    }
+
+    #[test]
+    fn test_cost_diff_table_unmatched_shows_footnote() {
+        let sessions = vec![make_session_summary(
+            "orphan123456",
+            "/proj/bar",
+            0.5,
+            1_000,
+            500,
+            0,
+            0,
+            None,
+            1,
+        )];
+        let diffs = vec![make_cost_diff("orphan123456", 0.5, None)];
+        let opts = default_opts(false);
+        let result = format_sl_cost_diff_table(&sessions, &diffs, &opts);
+        // unmatched entry should show "—" for litellm_cost
+        assert!(
+            result.contains('\u{2014}'),
+            "unmatched entry should show em-dash"
+        );
+        // footnote
+        assert!(
+            result.contains("unmatched"),
+            "should show unmatched footnote"
+        );
+    }
+
+    // ── JSON formatters ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_json_projects_basic_structure() {
+        let projects = vec![make_project_summary("/my/project", 2.5, 4)];
+        let meta = make_json_meta("projects");
+        let result = format_sl_json_projects(&projects, &meta);
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert!(parsed["meta"].is_object());
+        assert_eq!(parsed["meta"]["view"], "projects");
+        assert!(parsed["data"].is_array());
+        assert_eq!(parsed["data"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["data"][0]["project"], "/my/project");
+    }
+
+    #[test]
+    fn test_json_days_basic_structure() {
+        let days = vec![make_day_summary("2026-04-07", 0.99, 3)];
+        let meta = make_json_meta("days");
+        let result = format_sl_json_days(&days, &meta);
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert!(parsed["meta"].is_object());
+        assert!(parsed["data"].is_array());
+        assert_eq!(parsed["data"][0]["date"], "2026-04-07");
+        let cost = parsed["data"][0]["totalCost"].as_f64().unwrap();
+        assert!((cost - 0.99).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_json_cost_diff_structure_matched() {
+        let diffs = vec![
+            make_cost_diff("session-aaa", 1.0, Some(0.8)),
+            make_cost_diff("session-bbb", 0.5, None),
+        ];
+        let meta = make_json_meta("cost_diff");
+        let result = format_sl_json_cost_diff(&diffs, &meta);
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert!(parsed["meta"].is_object());
+        assert!(parsed["data"].is_array());
+        assert_eq!(parsed["data"].as_array().unwrap().len(), 2);
+        assert!(parsed["totals"].is_object());
+        assert_eq!(parsed["totals"]["matchedCount"], 1);
+        assert_eq!(parsed["totals"]["unmatchedCount"], 1);
+        let total_sl = parsed["totals"]["totalSlCost"].as_f64().unwrap();
+        // Only matched entry's sl_cost is summed
+        assert!((total_sl - 1.0).abs() < 1e-9, "total_sl={}", total_sl);
+    }
+
+    #[test]
+    fn test_json_cost_diff_all_unmatched() {
+        let diffs = vec![make_cost_diff("session-x", 0.3, None)];
+        let meta = make_json_meta("cost_diff");
+        let result = format_sl_json_cost_diff(&diffs, &meta);
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert!(parsed["totals"]["totalLitellmCost"].is_null());
+        assert_eq!(parsed["totals"]["unmatchedCount"], 1);
+    }
+
+    // ── CSV formatters ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_csv_ratelimit_basic_header_and_data() {
+        let entries = vec![make_ratelimit_entry(
+            1_774_483_200,
+            "my-session-id",
+            55,
+            1_774_500_000,
+            80,
+            1_775_000_000,
+        )];
+        let result = format_sl_csv_ratelimit(&entries, Some("UTC"));
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines.len(), 2, "header + 1 data row");
+        assert_eq!(lines[0], "Time,Cost,5h%,1w%,5h Resets,1w Resets,Session");
+        assert!(lines[1].contains("55"), "data row should contain 5h%");
+        assert!(lines[1].contains("80"), "data row should contain 1w%");
+        assert!(
+            lines[1].contains("my-session-id"),
+            "data row should contain full session id"
+        );
+    }
+
+    #[test]
+    fn test_csv_sessions_basic_header_and_data() {
+        let sessions = vec![make_session_summary(
+            "full-session-id-here",
+            "/home/user/proj",
+            0.123456,
+            3_600_000,
+            1_800_000,
+            100,
+            50,
+            Some(75),
+            2,
+        )];
+        let opts = default_opts(false);
+        let result = format_sl_csv_sessions(&sessions, &opts);
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines.len(), 2, "header + 1 data row");
+        assert!(lines[0].contains("Session"));
+        assert!(lines[0].contains("Project"));
+        assert!(lines[0].contains("API Time"));
+        assert!(lines[0].contains("Lines Added"));
+        assert!(lines[1].contains("full-session-id-here"));
+        assert!(lines[1].contains("/home/user/proj"));
+        // cost formatted with 6 decimal places
+        assert!(lines[1].contains("0.123456"));
+    }
+
+    // ── strip_ansi ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_strip_ansi_basic() {
+        assert_eq!(strip_ansi("\x1b[31mred\x1b[0m"), "red");
+    }
+
+    #[test]
+    fn test_strip_ansi_no_codes() {
+        assert_eq!(strip_ansi("plain text"), "plain text");
+    }
+
+    #[test]
+    fn test_strip_ansi_empty() {
+        assert_eq!(strip_ansi(""), "");
+    }
+
+    // ── csv_escape ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_csv_escape_plain_field() {
+        assert_eq!(csv_escape("hello"), "hello");
+    }
+
+    #[test]
+    fn test_csv_escape_with_comma() {
+        assert_eq!(csv_escape("a,b"), "\"a,b\"");
+    }
+
+    #[test]
+    fn test_csv_escape_with_double_quote() {
+        assert_eq!(csv_escape("say \"hi\""), "\"say \"\"hi\"\"\"");
+    }
+
+    #[test]
+    fn test_csv_escape_with_newline() {
+        assert_eq!(csv_escape("line1\nline2"), "\"line1\nline2\"");
+    }
+
+    // ── html_escape ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_html_escape_ampersand() {
+        assert_eq!(html_escape("a & b"), "a &amp; b");
+    }
+
+    #[test]
+    fn test_html_escape_lt_gt() {
+        assert_eq!(html_escape("<tag>"), "&lt;tag&gt;");
+    }
+
+    #[test]
+    fn test_html_escape_double_quote() {
+        assert_eq!(html_escape("say \"hi\""), "say &quot;hi&quot;");
+    }
+
+    #[test]
+    fn test_html_escape_no_special_chars() {
+        assert_eq!(html_escape("plain"), "plain");
+    }
+
+    // ── fmt_pct_range ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_fmt_pct_range_equal_values() {
+        assert_eq!(fmt_pct_range(Some(30), Some(30)), "30%");
+    }
+
+    #[test]
+    fn test_fmt_pct_range_different_values() {
+        assert_eq!(fmt_pct_range(Some(10), Some(50)), "10\u{2013}50%");
+    }
+
+    #[test]
+    fn test_fmt_pct_range_none() {
+        assert_eq!(fmt_pct_range(None, None), "\u{2014}");
+    }
+
+    #[test]
+    fn test_fmt_pct_range_partial_none() {
+        assert_eq!(fmt_pct_range(Some(10), None), "\u{2014}");
+        assert_eq!(fmt_pct_range(None, Some(20)), "\u{2014}");
+    }
+
+    // ── fmt_dt / fmt_time timezone variants ─────────────────────────────────
+
+    #[test]
+    fn test_fmt_dt_utc() {
+        // 2026-04-08T00:00:00Z
+        let dt = Utc.timestamp_opt(1_775_606_400, 0).single().unwrap();
+        let result = fmt_dt(&dt, Some("UTC"), "%Y-%m-%d");
+        assert_eq!(result, "2026-04-08");
+    }
+
+    #[test]
+    fn test_fmt_dt_fixed_offset_plus8() {
+        // 2026-04-08T00:00:00Z → 2026-04-08T08:00:00+08:00
+        let dt = Utc.timestamp_opt(1_775_606_400, 0).single().unwrap();
+        let result = fmt_dt(&dt, Some("+08:00"), "%H:%M");
+        assert_eq!(result, "08:00");
+    }
+
+    #[test]
+    fn test_fmt_dt_iana_timezone() {
+        // 2026-04-08T12:00:00Z → 08:00 America/New_York (UTC-4 during DST)
+        let dt = Utc.timestamp_opt(1_775_649_600, 0).single().unwrap();
+        let result = fmt_dt(&dt, Some("America/New_York"), "%H:%M");
+        assert_eq!(result, "08:00");
+    }
+
+    #[test]
+    fn test_fmt_dt_unknown_tz_falls_back() {
+        // Unknown TZ falls back to local; just verify it doesn't panic and returns a string
+        let dt = Utc.timestamp_opt(1_744_070_400, 0).single().unwrap();
+        let result = fmt_dt(&dt, Some("Not/AReal_Zone"), "%Y-%m-%d");
+        assert!(!result.is_empty(), "should not be empty for unknown tz");
+    }
+
+    // ── render_markdown ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_render_markdown_basic_structure() {
+        let headers = vec!["Name".to_string(), "Value".to_string()];
+        let rows = vec![vec!["foo".to_string(), "42".to_string()]];
+        let result = render_markdown(&headers, &rows, None);
+        let lines: Vec<&str> = result.lines().collect();
+        // Line 0: header row
+        assert!(lines[0].starts_with('|'), "header row starts with pipe");
+        assert!(lines[0].contains("Name") && lines[0].contains("Value"));
+        // Line 1: separator
+        assert!(lines[1].contains(":---"), "should have left-align marker");
+        assert!(lines[1].contains("---:"), "should have right-align marker");
+        // Line 2: data row
+        assert!(lines[2].contains("foo") && lines[2].contains("42"));
+    }
+
+    #[test]
+    fn test_render_markdown_strips_ansi() {
+        let headers = vec!["Col".to_string()];
+        let rows = vec![vec!["\x1b[32mgreen\x1b[0m".to_string()]];
+        let result = render_markdown(&headers, &rows, None);
+        // ANSI codes should be stripped
+        assert!(
+            !result.contains("\x1b["),
+            "markdown should strip ANSI codes"
+        );
+        assert!(result.contains("green"), "should contain the plain text");
+    }
+
+    #[test]
+    fn test_render_markdown_with_totals() {
+        let headers = vec!["Label".to_string(), "Cost".to_string()];
+        let rows = vec![vec!["row1".to_string(), "1.00".to_string()]];
+        let totals = vec!["TOTAL".to_string(), "1.00".to_string()];
+        let result = render_markdown(&headers, &rows, Some(&totals));
+        // totals row should use bold (**text**)
+        assert!(
+            result.contains("**TOTAL**"),
+            "totals should be bold in markdown"
+        );
+    }
+
+    // ── render_html ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_render_html_basic_structure() {
+        let headers = vec!["Name".to_string(), "Cost".to_string()];
+        let rows = vec![vec!["proj1".to_string(), "1.23".to_string()]];
+        let result = render_html(&headers, &rows, None);
+        assert!(result.contains("<!DOCTYPE html>"), "should have DOCTYPE");
+        assert!(result.contains("<table>"), "should have table tag");
+        assert!(result.contains("<thead>"), "should have thead");
+        assert!(result.contains("<tbody>"), "should have tbody");
+        assert!(result.contains("Name"), "should contain header Name");
+        assert!(result.contains("proj1"), "should contain row data");
+        assert!(result.contains("1.23"), "should contain cost");
+    }
+
+    #[test]
+    fn test_render_html_escapes_special_chars() {
+        let headers = vec!["Label".to_string()];
+        let rows = vec![vec!["a & <b>\"test\"</b>".to_string()]];
+        let result = render_html(&headers, &rows, None);
+        assert!(result.contains("&amp;"), "& should be escaped");
+        assert!(result.contains("&lt;"), "< should be escaped");
+        assert!(result.contains("&gt;"), "> should be escaped");
+        assert!(result.contains("&quot;"), "\" should be escaped");
+    }
+
+    #[test]
+    fn test_render_html_with_totals_in_tfoot() {
+        let headers = vec!["Label".to_string(), "Value".to_string()];
+        let rows = vec![vec!["r1".to_string(), "5".to_string()]];
+        let totals = vec!["TOTAL".to_string(), "5".to_string()];
+        let result = render_html(&headers, &rows, Some(&totals));
+        assert!(result.contains("<tfoot>"), "should have tfoot");
+        assert!(
+            result.contains("totals-main"),
+            "totals row should have totals-main class"
+        );
+        assert!(result.contains("TOTAL"), "should contain TOTAL in tfoot");
+    }
+
+    // ── render_tsv ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_render_tsv_basic() {
+        let headers = vec!["A".to_string(), "B".to_string()];
+        let rows = vec![vec!["x".to_string(), "y".to_string()]];
+        let result = render_tsv(&headers, &rows, None);
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines.len(), 2, "header + 1 data row");
+        assert!(lines[0].contains('\t'), "should be tab-separated");
+        assert!(lines[0] == "A\tB");
+        assert!(lines[1] == "x\ty");
+    }
+
+    // ── render_csv ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_render_csv_basic() {
+        let headers = vec!["Name".to_string(), "Val".to_string()];
+        let rows = vec![vec!["item".to_string(), "99".to_string()]];
+        let result = render_csv(&headers, &rows, None);
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines[0], "Name,Val");
+        assert_eq!(lines[1], "item,99");
+    }
+
+    #[test]
+    fn test_render_csv_escapes_commas_in_fields() {
+        let headers = vec!["Desc".to_string()];
+        let rows = vec![vec!["one,two".to_string()]];
+        let result = render_csv(&headers, &rows, None);
+        let lines: Vec<&str> = result.lines().collect();
+        // field containing comma should be quoted
+        assert_eq!(lines[1], "\"one,two\"");
+    }
+
+    #[test]
+    fn test_render_csv_with_totals() {
+        let headers = vec!["Label".to_string(), "Cost".to_string()];
+        let rows = vec![vec!["r1".to_string(), "1.0".to_string()]];
+        let totals = vec!["TOTAL".to_string(), "1.0".to_string()];
+        let result = render_csv(&headers, &rows, Some(&totals));
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines.len(), 3, "header + data + totals");
+        assert!(lines[2].contains("TOTAL"), "last line should be totals");
+    }
+
+    // ── render_json ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_render_json_basic() {
+        let headers = vec!["Name".to_string(), "Value".to_string()];
+        let rows = vec![vec!["alpha".to_string(), "10".to_string()]];
+        let result = render_json(&headers, &rows, None);
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert!(parsed.is_array());
+        let arr = parsed.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["Name"], "alpha");
+        assert_eq!(arr[0]["Value"], "10");
+    }
+
+    #[test]
+    fn test_render_json_with_totals() {
+        let headers = vec!["Label".to_string(), "Cost".to_string()];
+        let rows = vec![vec!["r1".to_string(), "1.00".to_string()]];
+        let totals = vec!["TOTAL".to_string(), "1.00".to_string()];
+        let result = render_json(&headers, &rows, Some(&totals));
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        let arr = parsed.as_array().unwrap();
+        // rows + totals = 2 entries
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[1]["Label"], "TOTAL");
+    }
+
+    #[test]
+    fn test_render_json_strips_ansi() {
+        let headers = vec!["Col".to_string()];
+        let rows = vec![vec!["\x1b[32mgreen\x1b[0m".to_string()]];
+        let result = render_json(&headers, &rows, None);
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(parsed[0]["Col"], "green");
+    }
 }

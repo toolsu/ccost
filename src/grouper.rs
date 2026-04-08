@@ -75,6 +75,14 @@ fn get_group_key_resolved(
         GroupDimension::Day => format_timestamp_resolved(record, "%Y-%m-%d", tz),
         GroupDimension::Hour => format_timestamp_resolved(record, "%Y-%m-%d %H:00", tz),
         GroupDimension::Month => format_timestamp_resolved(record, "%Y-%m", tz),
+        GroupDimension::Tool => {
+            if record.tool_names.is_empty() {
+                "(text)".to_string()
+            } else {
+                record.tool_names.clone()
+            }
+        }
+        GroupDimension::Line => format!("#{}", record.line),
     }
 }
 
@@ -243,10 +251,27 @@ pub fn group_records(
 }
 
 /// Sort a vec of GroupedData by label, in the specified order.
+/// Extract numeric value from a "#N" or "#N (setup)" label for sorting.
+fn turn_sort_key(label: &str) -> Option<u32> {
+    let s = label.strip_prefix('#')?;
+    let num_part = s.split_once(' ').map(|(n, _)| n).unwrap_or(s);
+    num_part.parse().ok()
+}
+
 fn sort_grouped_data(data: &mut [GroupedData], order: SortOrder) {
     match order {
-        SortOrder::Asc => data.sort_by(|a, b| a.label.cmp(&b.label)),
-        SortOrder::Desc => data.sort_by(|a, b| b.label.cmp(&a.label)),
+        SortOrder::Asc => data.sort_by(|a, b| {
+            match (turn_sort_key(&a.label), turn_sort_key(&b.label)) {
+                (Some(na), Some(nb)) => na.cmp(&nb),
+                _ => a.label.cmp(&b.label),
+            }
+        }),
+        SortOrder::Desc => data.sort_by(|a, b| {
+            match (turn_sort_key(&a.label), turn_sort_key(&b.label)) {
+                (Some(na), Some(nb)) => nb.cmp(&na),
+                _ => b.label.cmp(&a.label),
+            }
+        }),
     }
 }
 
@@ -272,6 +297,8 @@ mod tests {
             session_id: session.to_string(),
             project: project.to_string(),
             agent_id: String::new(),
+            tool_names: String::new(),
+            line: 0,
             input_tokens: 100,
             output_tokens: 50,
             cache_creation_tokens: 0,

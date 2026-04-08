@@ -724,6 +724,8 @@ mod tests {
             session_id: "s1".to_string(),
             project: "p1".to_string(),
             agent_id: String::new(),
+            tool_names: String::new(),
+            line: 0,
             input_tokens: tokens,
             output_tokens: tokens,
             cache_creation_tokens: 0,
@@ -919,5 +921,262 @@ mod tests {
             x_label_for_granularity("2025-03", Granularity::Month),
             "2025-03"
         );
+    }
+
+    // ── render_chart_raw tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_render_chart_raw_basic() {
+        let keys = vec![
+            "2025-01".to_string(),
+            "2025-02".to_string(),
+            "2025-03".to_string(),
+        ];
+        let values = vec![1.0, 5.0, 3.0];
+        let result = render_chart_raw(&keys, &values, "My Title", y_label_cost, Some(60), Some(5));
+        assert!(result.contains("My Title"), "output must contain the title");
+        assert!(
+            result.contains('\u{2524}'),
+            "output must contain ┤ border char"
+        );
+        assert!(
+            result.contains('\u{2514}'),
+            "output must contain └ border char"
+        );
+    }
+
+    #[test]
+    fn test_render_chart_raw_empty() {
+        let result = render_chart_raw(&[], &[], "Empty", y_label_cost, None, None);
+        assert_eq!(result, "No data to chart.");
+    }
+
+    #[test]
+    fn test_render_chart_raw_single_point() {
+        let keys = vec!["2025-01".to_string()];
+        let values = vec![42.0];
+        // Must not panic and must produce output with the title
+        let result = render_chart_raw(&keys, &values, "Single", y_label_cost, Some(40), Some(4));
+        assert!(result.contains("Single"));
+        assert!(!result.is_empty());
+    }
+
+    // ── y_label_percent tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_y_label_percent() {
+        assert_eq!(y_label_percent(0.0), "0%");
+        assert_eq!(y_label_percent(50.0), "50%");
+        assert_eq!(y_label_percent(100.0), "100%");
+    }
+
+    // ── auto_granularity tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_auto_granularity_single_record() {
+        let records = vec![make_record(
+            Utc.with_ymd_and_hms(2025, 6, 1, 0, 0, 0).unwrap(),
+            1.0,
+            100,
+        )];
+        // Single record → Day (early return for len < 2)
+        assert_eq!(auto_granularity(&records), Granularity::Day);
+    }
+
+    // ── auto_granularity_from_labels tests ────────────────────────────
+
+    #[test]
+    fn test_auto_granularity_from_labels_empty() {
+        assert_eq!(auto_granularity_from_labels(&[]), Granularity::Day);
+    }
+
+    #[test]
+    fn test_auto_granularity_from_labels_space_separator() {
+        // "2025-01-15 10:00" has len > 10 and contains ':'  → Hour
+        assert_eq!(
+            auto_granularity_from_labels(&["2025-01-15 10:00"]),
+            Granularity::Hour
+        );
+    }
+
+    #[test]
+    fn test_auto_granularity_from_labels_unknown_format() {
+        // Unexpected format falls through to the final `else` branch → Day
+        assert_eq!(
+            auto_granularity_from_labels(&["some-random"]),
+            Granularity::Day
+        );
+    }
+
+    // ── render_chart (token mode) tests ────────────────────────────────
+
+    #[test]
+    fn test_render_chart_token_mode() {
+        let data = vec![
+            make_grouped("2025-01-01", 1.0, 500),
+            make_grouped("2025-01-02", 2.0, 1000),
+            make_grouped("2025-01-03", 1.5, 750),
+        ];
+        let totals = make_grouped("TOTAL", 4.5, 2250);
+        let options = ChartOptions {
+            mode: ChartModeEnum::Token,
+            dimension_label: "Date".to_string(),
+            price_mode: crate::types::PriceMode::Off,
+            tz: Some("UTC".to_string()),
+            width: Some(60),
+            height: Some(5),
+        };
+        let result = render_chart(&data, &totals, &options);
+        assert!(
+            result.contains("Tokens"),
+            "token mode title should be 'Tokens'"
+        );
+    }
+
+    #[test]
+    fn test_render_chart_cost_all_zero() {
+        let data = vec![
+            make_grouped("2025-01-01", 0.0, 0),
+            make_grouped("2025-01-02", 0.0, 0),
+        ];
+        let totals = make_grouped("TOTAL", 0.0, 0);
+        let options = ChartOptions {
+            mode: ChartModeEnum::Cost,
+            dimension_label: "Date".to_string(),
+            price_mode: crate::types::PriceMode::Off,
+            tz: Some("UTC".to_string()),
+            width: Some(60),
+            height: Some(5),
+        };
+        // All-zero values — must not panic; max_val == min_val path is exercised
+        let result = render_chart(&data, &totals, &options);
+        assert!(result.contains("Cost ($)"));
+    }
+
+    #[test]
+    fn test_render_chart_from_records_token_mode() {
+        let records = vec![
+            make_record(Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(), 1.0, 100),
+            make_record(Utc.with_ymd_and_hms(2025, 1, 2, 0, 0, 0).unwrap(), 2.0, 200),
+        ];
+        let options = ChartOptions {
+            mode: ChartModeEnum::Token,
+            dimension_label: "Date".to_string(),
+            price_mode: crate::types::PriceMode::Off,
+            tz: Some("UTC".to_string()),
+            width: Some(60),
+            height: Some(5),
+        };
+        let result = render_chart_from_records(&records, &options);
+        assert!(result.contains("Tokens"));
+    }
+
+    #[test]
+    fn test_render_chart_small_dimensions() {
+        let data = vec![
+            make_grouped("2025-01-01", 1.0, 100),
+            make_grouped("2025-01-02", 2.0, 200),
+        ];
+        let totals = make_grouped("TOTAL", 3.0, 300);
+        let options = ChartOptions {
+            mode: ChartModeEnum::Cost,
+            dimension_label: "Date".to_string(),
+            price_mode: crate::types::PriceMode::Off,
+            tz: Some("UTC".to_string()),
+            width: Some(20),
+            height: Some(3),
+        };
+        // Very small chart — must not panic
+        let result = render_chart(&data, &totals, &options);
+        assert!(!result.is_empty());
+    }
+
+    // ── bucket_key timezone tests ─────────────────────────────────────
+
+    #[test]
+    fn test_bucket_key_with_fixed_offset() {
+        // UTC noon → +05:30 is 17:30 the same day
+        let ts = Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap();
+        let key = bucket_key(&ts, Granularity::Hour, Some("+05:30"));
+        // Expected local time in +05:30 is 17:30; hour bucket → first 13 chars
+        assert_eq!(key, "2025-06-15T17");
+    }
+
+    #[test]
+    fn test_bucket_key_with_iana_tz() {
+        // UTC midnight → America/New_York is the previous day (Eastern is UTC-5 or UTC-4)
+        let ts = Utc.with_ymd_and_hms(2025, 6, 15, 4, 0, 0).unwrap();
+        let key = bucket_key(&ts, Granularity::Day, Some("America/New_York"));
+        // America/New_York in summer is UTC-4; 04:00 UTC → 00:00 ET (same date)
+        assert_eq!(key, "2025-06-15");
+    }
+
+    // ── format_in_tz tests ───────────────────────────────────────────
+
+    #[test]
+    fn test_format_in_tz_utc() {
+        let ts = Utc.with_ymd_and_hms(2025, 6, 15, 12, 30, 0).unwrap();
+        let result = format_in_tz(&ts, Some("UTC"));
+        assert_eq!(result, "2025-06-15T12:30:00");
+    }
+
+    #[test]
+    fn test_format_in_tz_fixed_offset() {
+        // +02:00 → noon UTC becomes 14:00 local
+        let ts = Utc.with_ymd_and_hms(2025, 6, 15, 12, 30, 0).unwrap();
+        let result = format_in_tz(&ts, Some("+02:00"));
+        assert_eq!(result, "2025-06-15T14:30:00");
+    }
+
+    #[test]
+    fn test_format_in_tz_iana() {
+        // America/New_York in summer is UTC-4; 12:30 UTC → 08:30 ET
+        let ts = Utc.with_ymd_and_hms(2025, 6, 15, 12, 30, 0).unwrap();
+        let result = format_in_tz(&ts, Some("America/New_York"));
+        assert_eq!(result, "2025-06-15T08:30:00");
+    }
+
+    #[test]
+    fn test_format_in_tz_invalid_fallback() {
+        // An invalid timezone string should fall back to local time — verify no panic.
+        let ts = Utc.with_ymd_and_hms(2025, 6, 15, 12, 30, 0).unwrap();
+        let result = format_in_tz(&ts, Some("Not/A/Timezone"));
+        // The result must be a valid "YYYY-MM-DDTHH:MM:SS" shaped string (19 chars)
+        assert_eq!(
+            result.len(),
+            19,
+            "fallback result should be 19 chars: {}",
+            result
+        );
+        assert!(
+            result.contains('T'),
+            "fallback result should contain 'T': {}",
+            result
+        );
+    }
+
+    // ── render_chart_raw with y_label_percent ─────────────────────────
+
+    #[test]
+    fn test_render_chart_raw_with_custom_y_label() {
+        let keys = vec!["t1".to_string(), "t2".to_string(), "t3".to_string()];
+        let values = vec![10.0, 60.0, 90.0];
+        let result = render_chart_raw(&keys, &values, "Rate", y_label_percent, Some(60), Some(5));
+        // y_label_percent(90.0) = "90%"; that label must appear in the output
+        assert!(
+            result.contains('%'),
+            "y_label_percent labels should include '%'"
+        );
+        assert!(result.contains("Rate"));
+    }
+
+    // ── x-label short keys (no panic) ────────────────────────────────
+
+    #[test]
+    fn test_x_label_short_keys() {
+        // Keys shorter than expected slicing length must not panic
+        assert_eq!(x_label_for_granularity("hi", Granularity::Hour), "hi");
+        assert_eq!(x_label_for_granularity("hi", Granularity::Day), "hi");
+        assert_eq!(x_label_for_granularity("hi", Granularity::Month), "hi");
     }
 }

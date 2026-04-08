@@ -23,6 +23,8 @@ sl pipeline: `load_sl_records → filter → aggregate (segment-aware) → forma
 
 **Subagent tracking:** Each `TokenRecord` and `PricedTokenRecord` carries an `agent_id` field — empty string for main session records, the subagent file stem (e.g. `agent-a0f53f284339341b2`) for subagent records. `GroupDimension::Subagent` groups by this field, labeling main session records as `(main)`.
 
+**Tool & line tracking:** Each record carries `tool_names: String` (comma-joined sorted unique tool names from `tool_use` content blocks, empty for text-only messages) and `line: u32` (1-based JSONL line number, consistent with ccfriend's `lineNumber` and URL anchors). Content is parsed with lightweight `RawContentItem` that only deserializes `type` and `name` fields — `input`, `text`, etc. are skipped by serde for performance. `GroupDimension::Tool` labels: tool names or `(text)`. `GroupDimension::Line` labels: `#N` (JSONL line number).
+
 **Pricing: flat rate per-record before grouping.** Each record gets its model's price. Supports `--live-pricing` (runtime fetch via reqwest) and `--pricing-data <path>` (custom file). Bundled pricing embedded via `include_str!`.
 
 **Project paths:** `-home-username-workspace-test` → `/home/username/workspace/test`. Filter with `--project /home/username/workspace/test`.
@@ -47,7 +49,7 @@ sl pipeline: `load_sl_records → filter → aggregate (segment-aware) → forma
 
 **Hour key format:** Grouper emits `%Y-%m-%d %H:00` (space separator). Chart `auto_granularity_from_labels` detects hour labels by checking `len > 10 && contains(':')` (matches both space and T separators).
 
-**Types:** `GroupDimension` and `SortOrder` implement `std::str::FromStr` (returns `Result<Self, String>`). Use `"day".parse::<GroupDimension>()` or `GroupDimension::from_str("day")`. Valid dimensions: `day`, `hour`, `month`, `session`, `project`, `model`, `subagent`. CLI supports `-h`/`-V` short flags in addition to `--help`/`--version`.
+**Types:** `GroupDimension` and `SortOrder` implement `std::str::FromStr` (returns `Result<Self, String>`). Use `"day".parse::<GroupDimension>()` or `GroupDimension::from_str("day")`. Valid dimensions: `day`, `hour`, `month`, `session`, `project`, `model`, `subagent`, `tool`, `line`. CLI supports `-h`/`-V` short flags in addition to `--help`/`--version`.
 
 ## Commands
 
