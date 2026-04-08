@@ -6,7 +6,7 @@ Reads JSONL files from `~/.claude/projects/`, deduplicates streaming entries, ca
 
 The [`ccost sl` subcommand](#statusline-analysis) ([setup statusline.jsonl first](#setup-for-statuslinejsonl)) analyzes `~/.claude/statusline.jsonl` for rate limit tracking, session summaries, budget estimation, and cost comparison (see [`ccost` vs `ccost sl`](#ccost-vs-ccost-sl)).
 
-Blazing fast CLI and library written in Rust with thorough tests. Also powers [CC Dashboard for Claude Code](https://github.com/cc-friend/ccfriend), a Tauri desktop app for visualizing your Claude Code usage and more.
+Blazing fast CLI and library written in Rust with thorough tests. Also powers [CC Friend (Claude Code Friend)](https://github.com/cc-friend/ccfriend), a Tauri desktop app for visualizing your Claude Code usage and more.
 
 [![crates.io](https://img.shields.io/crates/v/ccost)](https://crates.io/crates/ccost) [![npm](https://img.shields.io/npm/v/ccost)](https://www.npmjs.com/package/ccost) [![CI](https://github.com/cc-friend/ccost/actions/workflows/ci.yml/badge.svg)](https://github.com/cc-friend/ccost/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-brightgreen)](https://github.com/cc-friend/ccost/blob/main/LICENSE)
 
@@ -412,7 +412,7 @@ Below we'll compare `ccost` (data from `~/.claude/projects/`) and `ccost sl` (da
 
 As shown by `ccost sl --per session --cost-diff`, when LiteLLM pricing is accurate, the cost computed from `~/.claude/projects/` closely matches the server-reported cost in `statusline.jsonl`. The statusline cost may occasionally undercount because it does not always include subagent costs. Since `~/.claude/projects/` has full per-request token breakdowns, it may be the more reliable source for cost.
 
-The primary value of `statusline.jsonl` is the rate-limit percentages, not cost. This is why [CC Dashboard for Claude Code](https://github.com/cc-friend/ccfriend) uses cost data computed from `~/.claude/projects/` combined with the 5-hour and 1-week rate-limit percentages from `statusline.jsonl`.
+The primary value of `statusline.jsonl` is the rate-limit percentages, not cost. This is why [CC Friend (Claude Code Friend)](https://github.com/cc-friend/ccfriend) uses cost data computed from `~/.claude/projects/` combined with the 5-hour and 1-week rate-limit percentages from `statusline.jsonl`.
 
 ### Project Path Decoding
 
