@@ -260,18 +260,22 @@ fn turn_sort_key(label: &str) -> Option<u32> {
 
 fn sort_grouped_data(data: &mut [GroupedData], order: SortOrder) {
     match order {
-        SortOrder::Asc => data.sort_by(|a, b| {
-            match (turn_sort_key(&a.label), turn_sort_key(&b.label)) {
-                (Some(na), Some(nb)) => na.cmp(&nb),
-                _ => a.label.cmp(&b.label),
-            }
-        }),
-        SortOrder::Desc => data.sort_by(|a, b| {
-            match (turn_sort_key(&a.label), turn_sort_key(&b.label)) {
-                (Some(na), Some(nb)) => nb.cmp(&na),
-                _ => b.label.cmp(&a.label),
-            }
-        }),
+        SortOrder::Asc => {
+            data.sort_by(
+                |a, b| match (turn_sort_key(&a.label), turn_sort_key(&b.label)) {
+                    (Some(na), Some(nb)) => na.cmp(&nb),
+                    _ => a.label.cmp(&b.label),
+                },
+            )
+        }
+        SortOrder::Desc => {
+            data.sort_by(
+                |a, b| match (turn_sort_key(&a.label), turn_sort_key(&b.label)) {
+                    (Some(na), Some(nb)) => nb.cmp(&na),
+                    _ => b.label.cmp(&a.label),
+                },
+            )
+        }
     }
 }
 

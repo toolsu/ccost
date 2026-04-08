@@ -834,7 +834,7 @@ pub fn load_records(options: &LoadOptions) -> LoadResult {
         let tool_names = rec
             .message
             .as_ref()
-            .map(|m| extract_tool_names(m))
+            .map(extract_tool_names)
             .unwrap_or_default();
 
         filtered_records.push(TokenRecord {

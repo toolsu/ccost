@@ -2586,13 +2586,46 @@ fn mock_user_tool_result(ts: &str, tool_use_id: &str) -> serde_json::Value {
 fn test_per_tool_grouping() {
     let records = vec![
         // text-only assistant message
-        mock_rec("claude-opus-4-6", 1000, 500, 0, 0, "2026-01-15T10:00:00Z", "r1", "m1"),
+        mock_rec(
+            "claude-opus-4-6",
+            1000,
+            500,
+            0,
+            0,
+            "2026-01-15T10:00:00Z",
+            "r1",
+            "m1",
+        ),
         // assistant using Read
-        mock_rec_with_tools("claude-opus-4-6", 2000, 800, "2026-01-15T10:01:00Z", "r2", "m2", &["Read"]),
+        mock_rec_with_tools(
+            "claude-opus-4-6",
+            2000,
+            800,
+            "2026-01-15T10:01:00Z",
+            "r2",
+            "m2",
+            &["Read"],
+        ),
         // assistant using Edit
-        mock_rec_with_tools("claude-opus-4-6", 1500, 600, "2026-01-15T10:02:00Z", "r3", "m3", &["Edit"]),
+        mock_rec_with_tools(
+            "claude-opus-4-6",
+            1500,
+            600,
+            "2026-01-15T10:02:00Z",
+            "r3",
+            "m3",
+            &["Edit"],
+        ),
         // assistant using Read again
-        mock_rec_with_tools("claude-opus-4-6", 3000, 1000, "2026-01-15T10:03:00Z", "r4", "m4", &["Read"]),
+        mock_rec_with_tools(
+            "claude-opus-4-6",
+            3000,
+            1000,
+            "2026-01-15T10:03:00Z",
+            "r4",
+            "m4",
+            &["Read"],
+        ),
     ];
 
     let dir = make_fixture(&records);
@@ -2619,9 +2652,15 @@ fn test_per_tool_grouping() {
 
 #[test]
 fn test_per_tool_multi_tool_message() {
-    let records = vec![
-        mock_rec_with_tools("claude-opus-4-6", 1000, 500, "2026-01-15T10:00:00Z", "r1", "m1", &["Read", "Edit"]),
-    ];
+    let records = vec![mock_rec_with_tools(
+        "claude-opus-4-6",
+        1000,
+        500,
+        "2026-01-15T10:00:00Z",
+        "r1",
+        "m1",
+        &["Read", "Edit"],
+    )];
 
     let dir = make_fixture(&records);
     let opts = default_load_opts(dir.path());
@@ -2640,12 +2679,37 @@ fn test_per_line_grouping() {
     let records = vec![
         // Turn 1: user prompt → assistant response → tool result → assistant response
         mock_user_text("2026-01-15T10:00:00Z", "fix the bug"),
-        mock_rec_with_tools("claude-opus-4-6", 1000, 500, "2026-01-15T10:00:01Z", "r1", "m1", &["Read"]),
+        mock_rec_with_tools(
+            "claude-opus-4-6",
+            1000,
+            500,
+            "2026-01-15T10:00:01Z",
+            "r1",
+            "m1",
+            &["Read"],
+        ),
         mock_user_tool_result("2026-01-15T10:00:02Z", "toolu_0000"),
-        mock_rec("claude-opus-4-6", 2000, 800, 0, 0, "2026-01-15T10:00:03Z", "r2", "m2"),
+        mock_rec(
+            "claude-opus-4-6",
+            2000,
+            800,
+            0,
+            0,
+            "2026-01-15T10:00:03Z",
+            "r2",
+            "m2",
+        ),
         // Turn 2: user prompt → assistant response
         mock_user_text("2026-01-15T10:01:00Z", "now refactor it"),
-        mock_rec_with_tools("claude-opus-4-6", 3000, 1200, "2026-01-15T10:01:01Z", "r3", "m3", &["Edit"]),
+        mock_rec_with_tools(
+            "claude-opus-4-6",
+            3000,
+            1200,
+            "2026-01-15T10:01:01Z",
+            "r3",
+            "m3",
+            &["Edit"],
+        ),
     ];
 
     let dir = make_fixture(&records);
@@ -2686,8 +2750,24 @@ fn test_per_line_grouping() {
 #[test]
 fn test_per_session_per_tool_two_level() {
     let records = vec![
-        mock_rec_with_tools("claude-opus-4-6", 1000, 500, "2026-01-15T10:00:00Z", "r1", "m1", &["Read"]),
-        mock_rec_with_tools("claude-opus-4-6", 2000, 800, "2026-01-15T10:01:00Z", "r2", "m2", &["Edit"]),
+        mock_rec_with_tools(
+            "claude-opus-4-6",
+            1000,
+            500,
+            "2026-01-15T10:00:00Z",
+            "r1",
+            "m1",
+            &["Read"],
+        ),
+        mock_rec_with_tools(
+            "claude-opus-4-6",
+            2000,
+            800,
+            "2026-01-15T10:01:00Z",
+            "r2",
+            "m2",
+            &["Edit"],
+        ),
     ];
 
     let dir = make_fixture(&records);
